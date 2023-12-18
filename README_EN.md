@@ -24,5 +24,25 @@ How to use：
 
 important update log:
 ---
+> 2023-12-18 :
+> * Release EASY-EAI-Toolkit-3588-0.0.0
+> * update easyeai-api
+>     * common_api
+>         * [new] base64
+>         * [new] font_engine
+>         * [new] http
+>         * [new] ini
+>         * [new] qrcode
+>         * [new] system_opt
+> * update Demo
+>     * [new] common-base64
+>     * [new] common-font_engine
+>     * [new] common-http
+>     * [new] common-ini
+>     * [new] common-qrcode
+>     * [new] common-system_opt
+> * update Solution
+>     * [new] rtspMulitPlayer
+>
 > 2023-12-18 : 
 > * create this project

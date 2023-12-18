@@ -22,5 +22,25 @@
 
 重要更新：
 ---
+> 2023-12-18 :
+> * 发布 EASY-EAI-Toolkit-3588-0.0.0
+> * 更新 easyeai-api
+>     * 通用组件api
+>         * [新增] base64
+>         * [新增] font_engine
+>         * [新增] http
+>         * [新增] ini
+>         * [新增] qrcode
+>         * [新增] system_opt
+> * 新增【Api单例】
+>     * [新增] common-base64
+>     * [新增] common-font_engine
+>     * [新增] common-http
+>     * [新增] common-ini
+>     * [新增] common-qrcode
+>     * [新增] common-system_opt
+> * 新增【开发实例】
+>     * [新增] rtspMulitPlayer
+>
 > 2023-12-18 : 
 > * 创建本项目
