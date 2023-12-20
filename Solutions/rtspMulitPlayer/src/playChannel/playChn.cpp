@@ -15,6 +15,84 @@
 //=====================  PRJ  =====================
 #include "playChn.h"
 
+// 错误处理函数
+static gboolean on_error(GstBus *bus, GstMessage *message, gpointer data) {
+    GError *err;
+    gchar *debug_info;
+
+    // 解析错误消息
+    gst_message_parse_error(message, &err, &debug_info);
+    
+    g_printerr("Error received from element %s: %s\n", GST_OBJECT_NAME(message->src), err->message);
+    g_printerr("Debugging information: %s\n", debug_info ? debug_info : "none");
+
+    g_error_free(err);
+    g_free(debug_info);
+
+    // 返回FALSE表示从消息处理队列中删除消息
+    return TRUE;
+}
+
+void *busListen(void *para)
+{
+	GstElement *pPipeLine = (GstElement *)para;
+    if(NULL == pPipeLine)
+	    pthread_exit(NULL);
+        
+    /* Listen to the bus */
+    GstBus *bus = gst_element_get_bus (pPipeLine);
+    // 连接到错误信号
+    gst_bus_add_signal_watch(bus);
+    g_signal_connect(bus, "message::error", G_CALLBACK(on_error), NULL);
+    
+    gboolean terminate = FALSE;
+    GstMessage *msg;
+    do {
+        msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, (GstMessageType)(GST_MESSAGE_STATE_CHANGED | GST_MESSAGE_WARNING | GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+        /* Parse message */
+        if (msg != NULL) {
+            GError *err;
+            gchar *debug_info;
+            
+            switch (GST_MESSAGE_TYPE (msg)) {
+                case GST_MESSAGE_ERROR:
+                    gst_message_parse_error (msg, &err, &debug_info);
+                    g_printerr ("Error received from element %s: %s\n", GST_OBJECT_NAME (msg->src), err->message);
+                    g_printerr ("Debugging information: %s\n", debug_info ? debug_info : "none");
+                    g_clear_error (&err);
+                    g_free (debug_info);
+                    terminate = TRUE;
+                    break;
+                case GST_MESSAGE_EOS:
+                    g_print ("End-Of-Stream reached.\n");
+                    terminate = TRUE;
+                    break;
+                case GST_MESSAGE_STATE_CHANGED:
+                    /* We are only interested in state-changed messages from the pipeline */
+                    if (GST_MESSAGE_SRC (msg) == GST_OBJECT (pPipeLine)) {
+                        GstState old_state, new_state, pending_state;
+                        gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
+                        g_print ("Pipeline state changed from %s to %s:\n",
+                        gst_element_state_get_name (old_state), gst_element_state_get_name (new_state));
+                    }
+                    break;
+                default:
+                    /* We should not reach here */
+                    g_printerr ("Unexpected message received.\n");
+                    break;
+            }
+            gst_message_unref (msg);
+        }
+    } while (!terminate);
+
+    /* Free resources */
+    gst_object_unref(bus);
+    gst_element_set_state (pPipeLine, GST_STATE_NULL);
+    gst_object_unref (pPipeLine);
+   
+    pthread_exit(NULL);
+}
+
 /* This function will be called by the pad-added signal */
 static void pad_added_handler (GstElement *src, GstPad *new_pad, GstChannel_t *data)
 {
@@ -77,23 +155,6 @@ exit:
         gst_object_unref(audio_sinkPad);
 }
 
-// 错误处理函数
-static gboolean on_error(GstBus *bus, GstMessage *message, gpointer data) {
-    GError *err;
-    gchar *debug_info;
-
-    // 解析错误消息
-    gst_message_parse_error(message, &err, &debug_info);
-    
-    g_printerr("Error received from element %s: %s\n", GST_OBJECT_NAME(message->src), err->message);
-    g_printerr("Debugging information: %s\n", debug_info ? debug_info : "none");
-
-    g_error_free(err);
-    g_free(debug_info);
-
-    // 返回FALSE表示从消息处理队列中删除消息
-    return TRUE;
-}
 
 PlayChannel::PlayChannel(std::string strUrl, std::string strVedioFmt) :
 	bObjIsInited(false),
@@ -109,10 +170,7 @@ PlayChannel::~PlayChannel()
 int PlayChannel::init()
 {
     //CustomData data;
-    GstBus *bus;
-    GstMessage *msg;
     GstStateChangeReturn ret;
-    gboolean terminate = FALSE;
 
     /* Create the empty pipeline */
     mGstChn.pipeline = gst_pipeline_new ("test-pipeline");
@@ -143,58 +201,12 @@ int PlayChannel::init()
         gst_object_unref (mGstChn.pipeline);
         return -1;
     }
-    //createVideoDecChannel(&data);
 
-    /* Listen to the bus */
-    bus = gst_element_get_bus (mGstChn.pipeline);
-    // 连接到错误信号
-    gst_bus_add_signal_watch(bus);
-    g_signal_connect(bus, "message::error", G_CALLBACK(on_error), NULL);
-    bObjIsInited = true;
-    do {
-        msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, (GstMessageType)(GST_MESSAGE_STATE_CHANGED | GST_MESSAGE_WARNING | GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
-        /* Parse message */
-        if (msg != NULL) {
-            GError *err;
-            gchar *debug_info;
-            
-            switch (GST_MESSAGE_TYPE (msg)) {
-                case GST_MESSAGE_ERROR:
-                    gst_message_parse_error (msg, &err, &debug_info);
-                    g_printerr ("Error received from element %s: %s\n", GST_OBJECT_NAME (msg->src), err->message);
-                    g_printerr ("Debugging information: %s\n", debug_info ? debug_info : "none");
-                    g_clear_error (&err);
-                    g_free (debug_info);
-                    terminate = TRUE;
-                    break;
-                case GST_MESSAGE_EOS:
-                    g_print ("End-Of-Stream reached.\n");
-                    terminate = TRUE;
-                    break;
-                case GST_MESSAGE_STATE_CHANGED:
-                    /* We are only interested in state-changed messages from the pipeline */
-                    if (GST_MESSAGE_SRC (msg) == GST_OBJECT (mGstChn.pipeline)) {
-                        GstState old_state, new_state, pending_state;
-                        gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
-                        g_print ("Pipeline state changed from %s to %s:\n",
-                        gst_element_state_get_name (old_state), gst_element_state_get_name (new_state));
-                    }
-                    break;
-                default:
-                    /* We should not reach here */
-                    g_printerr ("Unexpected message received.\n");
-                    break;
-            }
-            gst_message_unref (msg);
-        }
-    } while (!terminate);
-
-   /* Free resources */
-   gst_object_unref(bus);
-   gst_element_set_state (mGstChn.pipeline, GST_STATE_NULL);
-   gst_object_unref (mGstChn.pipeline);
+	if(0 == CreateNormalThread(busListen, mGstChn.pipeline, &mTid)){
+        bObjIsInited = true;
+	}
    
-   return 0;
+    return 0;
 }
 
 int PlayChannel::createVideoDecChannel()

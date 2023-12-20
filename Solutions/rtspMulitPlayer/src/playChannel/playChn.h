@@ -36,7 +36,7 @@ protected:
 private:
     //int32_t m_dwChnId;
     
-	//pthread_t mTid;
+	pthread_t mTid;
 	int bObjIsInited;
 
     std::string mStrUrl;
