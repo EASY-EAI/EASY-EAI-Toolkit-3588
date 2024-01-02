@@ -24,6 +24,17 @@ How to use：
 
 important update log:
 ---
+> 2024-01-02 :
+> * Release EASY-EAI-Toolkit-3588-0.0.1
+> * update easyeai-api
+>     * common_api
+>         * [update] ini
+> * update Demo
+>     * [update] common-http
+>     * [update] common-ini
+> * update Solution
+>     * [update] rtspMulitPlayer
+>
 > 2023-12-18 :
 > * Release EASY-EAI-Toolkit-3588-0.0.0
 > * update easyeai-api

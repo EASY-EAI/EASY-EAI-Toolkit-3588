@@ -69,13 +69,17 @@ find_package(OpenCV REQUIRED)
 ##   <prefix>_CFLAGS：所有的编译器cflags
 ##   <prefix>_CFLAGS_OTHER：其他的编译器cflags
 find_package(PkgConfig)
+pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 pkg_search_module(GST1.0 REQUIRED gstreamer-1.0)
+pkg_check_modules(GST1.0_VIDEO REQUIRED gstreamer-video-1.0)
 
 # -I
 set(custom_inc
     #${CMAKE_SYSROOT}/usr/include/rkfacial 
     ${OpenCV_INCLUDE_DIRS} 
+    ${GTK3_INCLUDE_DIRS} 
     ${GST1.0_INCLUDE_DIRS} 
+    ${GST1.0_VIDEO_INCLUDE_DIRS} 
     ${PROJECT_SOURCE_DIR}/include
 )
 # -L
@@ -84,12 +88,17 @@ link_directories(
 )
 # -l
 set(custom_libs
-    ${OpenCV_LIBS}
-    ${GST1.0_LIBRARIES}
+    rga 
+    ${OpenCV_LIBS} 
+    ${GTK3_LIBRARIES} 
+    ${GST1.0_LIBRARIES} 
+    ${GST1.0_VIDEO_LIBRARIES} 
 )
 # source code
 aux_source_directory(./src dir_srcs)
-aux_source_directory(./src/playChannel dir_srcs)
+aux_source_directory(./src/capturer dir_srcs)
+aux_source_directory(./src/analyzer dir_srcs)
+aux_source_directory(./src/player dir_srcs)
 # ========================== custom ============================
 
 

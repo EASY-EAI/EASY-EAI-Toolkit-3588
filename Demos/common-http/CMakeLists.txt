@@ -17,8 +17,8 @@ endif()
 project(${CURRENT_FOLDER})
 add_definitions(-Wall -Wpointer-arith)
 # use c++ 11
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wall")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wall -pthread")
 
 # ======================== easyeai_api =========================
 set(toolkit_root ${CMAKE_CURRENT_SOURCE_DIR}/../../easyeai-api)
@@ -45,11 +45,18 @@ set(sysLib_list
     )
 
 #--------------------------
-# test-http
+# test-http_client
 #--------------------------
-set(demoTag test-http)
+set(demoTag test-http_client)
 add_executable(${demoTag} ${demoTag}.c ${api_srcs}) #-o
 target_link_libraries(${demoTag} ${sysLib_list}) #-l
 target_include_directories(${demoTag} PRIVATE ${api_inc}) #-I
 
+#--------------------------
+# test-http_server
+#--------------------------
+set(demoTag test-http_server)
+add_executable(${demoTag} ${demoTag}.cpp ${api_srcs}) #-o
+target_link_libraries(${demoTag} ${sysLib_list}) #-l
+target_include_directories(${demoTag} PRIVATE ${api_inc}) #-I
 

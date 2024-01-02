@@ -22,6 +22,17 @@
 
 重要更新：
 ---
+> 2024-01-02 :
+> * 发布 EASY-EAI-Toolkit-3588-0.0.1
+> * 更新 easyeai-api
+>     * 通用组件api
+>         * [更新] ini
+> * 更新【Api单例】
+>     * [更新] common-http
+>     * [更新] common-ini
+> * 更新【开发实例】
+>     * [更新] rtspMulitPlayer
+>
 > 2023-12-18 :
 > * 发布 EASY-EAI-Toolkit-3588-0.0.0
 > * 更新 easyeai-api

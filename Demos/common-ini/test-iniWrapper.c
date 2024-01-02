@@ -5,7 +5,7 @@
 #include "ini_wrapper.h"
 
 
-#define SYSTEM_CONFIG_PATH "/userdata/Demo/systemCfg.ini"
+#define SYSTEM_CONFIG_PATH "./Release/systemCfg.ini"
 
 int main(void)
 {
