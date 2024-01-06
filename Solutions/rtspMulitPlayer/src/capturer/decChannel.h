@@ -1,6 +1,9 @@
 #ifndef __DECODECHANNEL_H__
 #define __DECODECHANNEL_H__
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include <gst/gst.h>
 
 typedef struct {

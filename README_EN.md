@@ -24,6 +24,18 @@ How to use：
 
 important update log:
 ---
+> 2024-01-06 :
+> * Release EASY-EAI-Toolkit-3588-0.0.2
+> * update easyeai-api
+>     * algorithm_api
+>         * [new] car_detect
+>     * common_api
+>         * [new] gst_opt
+> * update Demo
+>     * [new] algorithm-car
+> * update Solution
+>     * [update] rtspMulitPlayer
+>
 > 2024-01-02 :
 > * Release EASY-EAI-Toolkit-3588-0.0.1
 > * update easyeai-api

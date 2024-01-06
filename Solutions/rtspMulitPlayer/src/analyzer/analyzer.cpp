@@ -2,10 +2,8 @@
 #include <string>
 //=====================   C   =====================
 #include "system.h"
-#include "rga/RgaApi.h"
 //=====================  PRJ  =====================
 #include "analyzer.h"
-#include "algoProcess.h"
 
 
 //#define PTRINT uint32_t
@@ -16,7 +14,6 @@
 #define HAL_TRANSFORM_ROT_0 0x00
 
 static pthread_mutex_t gmutex;
-
 
 static char **gppDispMap = NULL;
 static int gChnNums = 0;
@@ -33,6 +30,8 @@ int analyzer_init(char **ppDispBuf, int chnNums)
 
     return 0;
 }
+
+
 
 typedef struct {
     RgaSURF_FORMAT fmt;
@@ -93,7 +92,6 @@ static RgaSURF_FORMAT rgaFmt(char *strFmt)
         return RK_FORMAT_UNKNOWN;
     }
 }
-
 static PTRINT calcBufMapOffset(int chnId, int units)
 {
     int xUnitOffset = chnId%units;
@@ -106,7 +104,7 @@ static PTRINT calcBufMapOffset(int chnId, int units)
     //printf("yU = %u, winHeight = %u, xU = %u, winWidth = %u, offset = %lu\n", yUnitOffset, winHeight, xUnitOffset, winWidth, BufMapOffset);
     return BufMapOffset;
 }
-static void commitImgtoDispBufMap(int chnId, void *pSrcData, RgaSURF_FORMAT srcFmt, int srcWidth, int srcHeight)
+static void commitImgtoDispBufMap(int chnId, void *pSrcData, RgaSURF_FORMAT srcFmt, int srcWidth, int srcHeight, int srcHStride, int srcVStride)
 {
     if(gChnNums <= 0)
         return ;
@@ -125,8 +123,8 @@ static void commitImgtoDispBufMap(int chnId, void *pSrcData, RgaSURF_FORMAT srcF
     srcImage.fmt = srcFmt;
     srcImage.width = srcWidth;
     srcImage.height = srcHeight;
-    srcImage.hor_stride = srcImage.width;
-    srcImage.ver_stride = srcImage.height;
+    srcImage.hor_stride = srcHStride;
+    srcImage.ver_stride = srcVStride;
     srcImage.rotation = HAL_TRANSFORM_ROT_0;
     srcImage.pBuf = pSrcData;
 
@@ -146,7 +144,7 @@ static void commitImgtoDispBufMap(int chnId, void *pSrcData, RgaSURF_FORMAT srcF
 int videoOutHandle(char *imgData, ImgDesc_t imgDesc)
 {
     if(*gppDispMap){
-        commitImgtoDispBufMap(imgDesc.chnId, (void *)imgData, rgaFmt(imgDesc.fmt), imgDesc.width, imgDesc.height);
+        commitImgtoDispBufMap(imgDesc.chnId, (void *)imgData, rgaFmt(imgDesc.fmt), imgDesc.width, imgDesc.height, imgDesc.horStride, imgDesc.verStride);
     }
     algorithm_process();
     

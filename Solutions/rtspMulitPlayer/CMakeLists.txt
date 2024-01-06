@@ -27,10 +27,12 @@ set(common_root    ${toolkit_root}/common)
 
 include (${common_root}/base64/api.cmake)
 include (${common_root}/system_opt/api.cmake)
+include (${common_root}/gst_opt/api.cmake)
 ## api头文件路径
 set(api_inc 
     ${BASE64_INCLUDE_DIRS} 
     ${SYSOPT_INCLUDE_DIRS} 
+    ${GSTOPT_INCLUDE_DIRS} 
     )
 ## api源文件路径
 file(GLOB api_srcs 
@@ -38,12 +40,14 @@ file(GLOB api_srcs
     ${SYSOPT_SOURCE_DIRS} 
     )
 ## api静态库文件路径
-#set(staticLib_objs 
-#    )
-## 依赖的动态库文件
+link_directories(
+   ${GSTOPT_LIBS_DIRS} 
+)
+## api所依赖的库参数
 set(sysLib_list 
     ${BASE64_LIBS} 
     ${SYSOPT_LIBS} 
+    ${GSTOPT_LIBS} 
     )
 # ======================== easyeai_api =========================
 
@@ -70,16 +74,15 @@ find_package(OpenCV REQUIRED)
 ##   <prefix>_CFLAGS_OTHER：其他的编译器cflags
 find_package(PkgConfig)
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
-pkg_search_module(GST1.0 REQUIRED gstreamer-1.0)
-pkg_check_modules(GST1.0_VIDEO REQUIRED gstreamer-video-1.0)
+#pkg_search_module(GST1.0 REQUIRED gstreamer-1.0)
+#pkg_check_modules(GST1.0_VIDEO REQUIRED gstreamer-video-1.0)
 
 # -I
 set(custom_inc
-    #${CMAKE_SYSROOT}/usr/include/rkfacial 
     ${OpenCV_INCLUDE_DIRS} 
     ${GTK3_INCLUDE_DIRS} 
-    ${GST1.0_INCLUDE_DIRS} 
-    ${GST1.0_VIDEO_INCLUDE_DIRS} 
+    #${GST1.0_INCLUDE_DIRS} 
+    #${GST1.0_VIDEO_INCLUDE_DIRS} 
     ${PROJECT_SOURCE_DIR}/include
 )
 # -L
@@ -91,8 +94,8 @@ set(custom_libs
     rga 
     ${OpenCV_LIBS} 
     ${GTK3_LIBRARIES} 
-    ${GST1.0_LIBRARIES} 
-    ${GST1.0_VIDEO_LIBRARIES} 
+    #${GST1.0_LIBRARIES} 
+    #${GST1.0_VIDEO_LIBRARIES} 
 )
 # source code
 aux_source_directory(./src dir_srcs)
@@ -105,7 +108,7 @@ aux_source_directory(./src/player dir_srcs)
 #--------------------------
 # execute file
 #--------------------------
-add_executable(${CURRENT_FOLDER} ${dir_srcs} ${api_srcs})		#-o
+add_executable(${CURRENT_FOLDER} ${dir_srcs} ${api_srcs})   #-o
 target_include_directories(${CURRENT_FOLDER} PRIVATE ${custom_inc} ${api_inc})
 target_link_libraries(${CURRENT_FOLDER} ${custom_libs} ${sysLib_list})
 

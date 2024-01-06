@@ -1,12 +1,15 @@
 #ifndef __CAPTURER_H__
 #define __CAPTURER_H__
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "decChannel.h"
 
 class Capturer
 {
 public:
-	Capturer(int chnId, std::string strUrl, std::string strVedioFmt = "h264");
+	Capturer(int chnId, SrcCfg_t config);
 	~Capturer();
 
     int32_t init(){if(mpDecChannel){return mpDecChannel->init();}else{return -1;}}

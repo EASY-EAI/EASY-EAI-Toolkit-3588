@@ -22,6 +22,18 @@
 
 重要更新：
 ---
+> 2024-01-06 :
+> * 发布 EASY-EAI-Toolkit-3588-0.0.2
+> * 更新 easyeai-api
+>     * 算法组件api
+>         * [新增] car_detect
+>     * 通用组件api
+>         * [新增] gst_opt
+> * 更新【Api单例】
+>     * [新增] algorithm-car
+> * 更新【开发实例】
+>     * [更新] rtspMulitPlayer
+>
 > 2024-01-02 :
 > * 发布 EASY-EAI-Toolkit-3588-0.0.1
 > * 更新 easyeai-api

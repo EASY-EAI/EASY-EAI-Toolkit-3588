@@ -8,10 +8,9 @@ cd $SHELL_FOLDER
 CUR_DIR_NAME=`basename "$SHELL_FOLDER"`
 warring() {
 	echo "DESCRIPTION"
-	echo "EASYAI-1109_1126 Solution Project."
+	echo "EASYAI-3588 Solution Project."
 	echo " "
-	echo "./build.sh       : build solution && copy app file"
-	echo "./build.sh cpres : build solution && copy all resource files(include app)"
+	echo "./build.sh       : build solution"
 	echo "./build.sh clear : clear all compiled files(just preserve source code)"
 	echo " "
 }
@@ -31,7 +30,6 @@ make -j24
 
 # make Release files
 mkdir -p "../Release" && cp $CUR_DIR_NAME "../Release"
-cp ../config/rtspClient.ini ../Release
 chmod 777 ../Release -R
 
 exit 0

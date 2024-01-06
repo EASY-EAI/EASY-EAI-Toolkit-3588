@@ -6,16 +6,13 @@
 //=====================   C   =====================
 #include <gst/video/video-info.h>
 #include "system.h"
-//#include "network.h"
-//#include "ipcData.h"
-//#include "config.h"
 //=====================  SDK  =====================
 #include "system_opt.h"
-//#include "ini_wrapper.h"
-//#include "ipc.h"
+#include "gst_opt.h"
 //=====================  PRJ  =====================
+#include "decChannel.h"
+
 #include "../analyzer/analyzer.h"
-#include "capturer.h"
 
 // 错误处理函数
 static gboolean on_error(GstBus *bus, GstMessage *message, gpointer data) {
@@ -107,35 +104,6 @@ exit:
     if(audio_sinkPad)
         gst_object_unref(audio_sinkPad);
 }
-
-// 回调函数，用于处理从 pad 接收到的数据
-static GstPadProbeReturn padProbeCallback(GstPad *pad, GstPadProbeInfo *probeInfo, gpointer user_data) {
-    // 格式化sinkPad信息
-    GstCaps *caps = gst_pad_get_current_caps(pad);
-    GstStructure *structure = gst_caps_get_structure(caps, 0);
-    const gchar *fmt = gst_structure_get_string(structure, "format");
-    GstVideoInfo videoInfo;
-    gst_video_info_from_caps(&videoInfo, caps);
-    gint width  = GST_VIDEO_INFO_WIDTH(&videoInfo);
-    gint height = GST_VIDEO_INFO_HEIGHT(&videoInfo);
-    if ((0==width)||(0==height)) {
-        g_print ("gst_structure_get_int fail\n");
-        return GST_PAD_PROBE_DROP;
-    }
-    
-    // info和buffer中的数据不能直接操作
-    GstBuffer *buffer = GST_PAD_PROBE_INFO_BUFFER(probeInfo);
-    // >> 使用mapinfo获取图像数据
-    GstMapInfo map_info;
-    if (!gst_buffer_map(buffer, &map_info, GST_MAP_READ)) {		//映射出数据
-        g_print("gst_buffer_map() error!");
-        return GST_PAD_PROBE_DROP;
-    }
-    g_print("%s [%dx%d] data size = %ld \n", fmt, width, height, map_info.size);
-    
-    return GST_PAD_PROBE_OK;
-}
-
 static GstFlowReturn new_sample(GstElement *sink, gpointer user_data){
     GstChannel_t *data = (GstChannel_t *)user_data;
 
@@ -143,42 +111,27 @@ static GstFlowReturn new_sample(GstElement *sink, gpointer user_data){
     GstSample *sample;
     g_signal_emit_by_name(sink, "pull-sample", &sample);
     if (sample){
-        //提取一帧sample中的caps, 通过caps获取【视频数据】的【描述信息】
-        GstCaps *caps = gst_sample_get_caps(sample);
-        if (!caps) {
-            g_print ("gst_sample_get_caps fail\n");
-            gst_sample_unref(sample);
-            return GST_FLOW_ERROR;
-        }
-        GstStructure *structure = gst_caps_get_structure(caps, 0);
-        const gchar *fmt = gst_structure_get_string(structure, "format");
-        GstVideoInfo video_info;
-        gst_video_info_from_caps(&video_info, caps);
-        gint width  = GST_VIDEO_INFO_WIDTH(&video_info);
-        gint height = GST_VIDEO_INFO_HEIGHT(&video_info);
-        if ((0==width)||(0==height)) {
-            g_print ("gst_structure_get_int fail\n");
-            gst_sample_unref (sample);
-            return GST_FLOW_ERROR;
-        }
-        
+        FrameDesc_t stFrameDesc;
         //提取一帧sample中的buffer, 注意:这个buffer是无法直接用的,它不是char类型
-        GstBuffer *buffer = gst_sample_get_buffer(sample);		
+        GstBuffer *buffer = gstopt_sample_get_buffer(sample, &stFrameDesc);		
         if(!buffer){
             g_print ("gst_sample_get_buffer fail\n");
             gst_sample_unref (sample);
             return GST_FLOW_ERROR;
         }
+        
         //把buffer映射到map，这样我们就可以通过map.data取到buffer的数据
         GstMapInfo map;
         if (gst_buffer_map (buffer, &map, GST_MAP_READ)){
             // g_print("data size = %ld , info_size = %ld\n", map.size, GST_VIDEO_INFO_SIZE(&video_info));
             ImgDesc_t imgDesc = {0};
             imgDesc.chnId = data->chnId;
-            imgDesc.width = width;
-            imgDesc.height = height;
+            imgDesc.width = stFrameDesc.width;
+            imgDesc.height = stFrameDesc.height;
+            imgDesc.horStride = stFrameDesc.horStride;
+            imgDesc.verStride = stFrameDesc.verStride;
             imgDesc.dataSize = map.size;
-            strcpy(imgDesc.fmt, fmt);
+            strcpy(imgDesc.fmt, stFrameDesc.strFmt);
             videoOutHandle((char *)map.data, imgDesc);
             
             gst_buffer_unmap (buffer, &map);	//解除映射
@@ -322,7 +275,6 @@ int DecChannel::createVideoDecChannel()
         g_printerr ("invaild stream format.\n");
         return -1;
     }
-    //mGstChn.vDec        = gst_element_factory_make("avdec_h265", "vDec");
     mGstChn.vDec        = gst_element_factory_make("mppvideodec", "vDec");
     mGstChn.vScale      = gst_element_factory_make("videoscale",  "vScale");
     mGstChn.vCapsfilter = gst_element_factory_make("capsfilter",  "vCapsfilter");
@@ -340,25 +292,24 @@ int DecChannel::createVideoDecChannel()
     g_object_set(mGstChn.vCapsfilter, "caps", caps, NULL);
     gst_caps_unref(caps);
 #endif
-    // 把
-    g_object_set(mGstChn.vDec, "format", GST_VIDEO_FORMAT_BGR, NULL);
+
+//  用appsink接住输出的视频流，用作后续处理
+//  参考：https://blog.csdn.net/qq_41563600/article/details/121257849
 #if 0
-     //date probe
-     GstPad *pad = gst_element_get_static_pad(mGstChn.vSink, "sink");
-     gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, (GstPadProbeCallback)padProbeCallback, NULL, NULL);
-     gst_object_unref (pad);
-#else
-    //  用appsink接住输出的视频流，用作后续处理
-    //  参考：https://blog.csdn.net/qq_41563600/article/details/121257849
+    // 把解码器的输出也要对应改成BGR格式
+    g_object_set(mGstChn.vDec, "format", GST_VIDEO_FORMAT_BGR, NULL);
     //GstCaps *caps = gst_caps_new_simple("video/x-raw",   "format",G_TYPE_STRING,"BGR",   NULL);
     GstCaps *caps = gst_caps_from_string(g_strdup_printf("video/x-raw,format=BGR"));
     if(caps){
         g_object_set(mGstChn.vSink, "caps", caps, NULL);
         gst_caps_unref(caps);
     }
+#endif
+    g_object_set(mGstChn.vSink, "sync", FALSE, NULL);
     g_object_set(mGstChn.vSink, "emit-signals", TRUE, NULL);
     g_signal_connect(mGstChn.vSink, "new-sample", G_CALLBACK(new_sample), &mGstChn);
-#endif
+
+    // 把一个个【元素】添加进【管线】
     gst_bin_add(GST_BIN(mGstChn.pipeline), mGstChn.h26xRTPDepay);
     gst_bin_add(GST_BIN(mGstChn.pipeline), mGstChn.h26xParse);
     gst_bin_add(GST_BIN(mGstChn.pipeline), mGstChn.vDec);

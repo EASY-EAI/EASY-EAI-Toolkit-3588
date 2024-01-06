@@ -33,12 +33,7 @@ static const SrcCfg_t SrcCfg_tab[] = {
 		.videoEncType = "h264",
 		.audioEncType = "null",
 /*
-	}, {
-		.srcType   = "rtsp",
-		.loaction  = "rtsp://admin:a12345678@192.168.1.69",
-		.videoEncType = "h264",
-		.audioEncType = "null",
-	}, { // *ÒÔÏÂ¸ñÊ½ÉĞÎ´ÑĞ·¢Íê³É£¬Ôİ²»Í¶ÈëÊ¹ÓÃ
+	}, { // *ä»¥ä¸‹æ ¼å¼å°šæœªç ”å‘å®Œæˆï¼Œæš‚ä¸æŠ•å…¥ä½¿ç”¨
 		.srcType   = "file",
 		.loaction  = "/userdata/mydata/car.mp4",
 		.videoEncType = "h264",
@@ -68,7 +63,7 @@ int main(int argc, char **argv)
     
     Capturer *pCapturer[32] = {NULL};
     for(int i = 0; i <chnNums; i++) {
-        pCapturer[i] = new Capturer(i, SrcCfg_tab[i].loaction, SrcCfg_tab[i].videoEncType);
+        pCapturer[i] = new Capturer(i, SrcCfg_tab[i]);
         if(pCapturer[i]){
             if(0 != pCapturer[i]->init()){
                 printf("playChn[%d] init faild\n", i);
@@ -79,12 +74,13 @@ int main(int argc, char **argv)
     }
 
     /* Initialize algotithm model */
-    if(ret = analyzer_init(pDispBuffer, chnNums)){
+    ret = analyzer_init(pDispBuffer, chnNums);
+    if(0 != ret){
         printf("Initialize algotithm model faild ! ret = %d\n", ret);
         return ret;
     }
 
-#if 1 //½øÈëÏÔÊ¾ÊÂ¼şÑ­»·
+#if 1 //è¿›å…¥æ˜¾ç¤ºäº‹ä»¶å¾ªç¯
     display(&dispDesc);
 #else
     while(1){

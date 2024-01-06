@@ -5,10 +5,10 @@
 //=====================  PRJ  =====================
 #include "capturer.h"
 
-Capturer::Capturer(int chnId, std::string strUrl, std::string strVedioFmt) :
+Capturer::Capturer(int chnId, SrcCfg_t config) :
     mpDecChannel(NULL)
 {
-    mpDecChannel = new DecChannel(chnId, strUrl, strVedioFmt);
+    mpDecChannel = new DecChannel(chnId, config.loaction, config.videoEncType);
 }
 Capturer::~Capturer()
 {
