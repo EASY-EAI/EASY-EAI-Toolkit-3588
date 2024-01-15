@@ -41,7 +41,7 @@ file(GLOB api_srcs
     )
 ## api静态库文件路径
 link_directories(
-   ${GSTOPT_LIBS_DIRS} 
+    ${GSTOPT_LIBS_DIRS} 
 )
 ## api所依赖的库参数
 set(sysLib_list 

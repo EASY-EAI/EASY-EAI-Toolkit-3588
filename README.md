@@ -22,6 +22,14 @@
 
 重要更新：
 ---
+> 2024-01-15 :
+> * 发布 EASY-EAI-Toolkit-3588-0.0.3
+> * 更新 easyeai-api
+>     * 通用组件api
+>         * [新增] modbus
+> * 更新【Api单例】
+>     * [新增] common-modbus
+>
 > 2024-01-06 :
 > * 发布 EASY-EAI-Toolkit-3588-0.0.2
 > * 更新 easyeai-api
