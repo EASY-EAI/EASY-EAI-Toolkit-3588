@@ -24,6 +24,14 @@ How to use：
 
 important update log:
 ---
+> 2024-02-22 :
+> * Release EASY-EAI-Toolkit-3588-0.0.4
+> * update easyeai-api
+>     * common_api
+>         * [new] rk_mpi
+> * update Solution
+>     * [new] avs(Any View Stitching)
+>
 > 2024-01-15 :
 > * Release EASY-EAI-Toolkit-3588-0.0.3
 > * update easyeai-api

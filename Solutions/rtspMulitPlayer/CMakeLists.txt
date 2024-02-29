@@ -72,6 +72,12 @@ find_package(OpenCV REQUIRED)
 ##   <prefix>_LDFLAGS_OTHER：额外的链接flags
 ##   <prefix>_CFLAGS：所有的编译器cflags
 ##   <prefix>_CFLAGS_OTHER：其他的编译器cflags
+## pkg_check_modules 和 pkg_search_module 的异/同：
+##   同：功能都是相同的，而且都能搜索多个模块，如：pkg_check_modules(AAAAA REQUIRED libxml-2.0 libxml2 libxml>=2)
+##   异：
+##       pkg_check_modules: 必须所有模块都存在，才能生效
+##       pkg_search_module: 只要第一个模块存在，就能生效
+
 find_package(PkgConfig)
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 #pkg_search_module(GST1.0 REQUIRED gstreamer-1.0)
