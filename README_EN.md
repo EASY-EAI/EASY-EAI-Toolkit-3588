@@ -24,6 +24,11 @@ How to use：
 
 important update log:
 ---
+> 2024-03-01 :
+> * Release EASY-EAI-Toolkit-3588-0.0.5
+> * update UiSolution
+>     * [new] QDemo
+>
 > 2024-02-22 :
 > * Release EASY-EAI-Toolkit-3588-0.0.4
 > * update easyeai-api

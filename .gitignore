@@ -16,7 +16,9 @@ cmake-out/
 prj/
 Demos/*/Release/test-*
 Solutions/*/Release
+.qmake.stash
 UiSolutions/*/Release
+UiSolutions/*/*.user
 
 logCfg
 
