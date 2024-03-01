@@ -19,6 +19,7 @@ Solutions/*/Release
 .qmake.stash
 UiSolutions/*/Release
 UiSolutions/*/*.user
+UiSolutions/*/Makefile
 
 logCfg
 

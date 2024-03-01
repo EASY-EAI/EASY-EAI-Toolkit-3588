@@ -1,16 +1,8 @@
 #!/bin/sh 
 
-set -e 
-alias_file=~/.bash_aliases
-if [ -e "$alias_file" ]; then
-        . $alias_file
-fi
-
 SHELL_FOLDER=$(cd "$(dirname "$0")";pwd)
 cd $SHELL_FOLDER
 CUR_DIR_NAME=`basename "$SHELL_FOLDER"`
-
-APP_NAME=${CUR_DIR_NAME}
 
 ##  Build:   ./build.sh
 ##  reBuild: ./build.sh all
@@ -27,6 +19,7 @@ elif [ "$1" = "clear" ];then
 fi
 set -e
 
+APP_NAME=${CUR_DIR_NAME}
 qmake $APP_NAME.pro
 make -j8
 
