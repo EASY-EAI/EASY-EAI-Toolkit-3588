@@ -25,6 +25,7 @@ fi
 rm -rf build
 mkdir build
 sudo cp ./lib64/librockit.so /usr/lib/
+sudo cp ./lib64/librkgfx_avs.so /usr/lib/
 sudo cp ./lib64/libgraphic_lsf.so /usr/lib/
 sudo cp ./lib64/libpanoStitchApp.so /usr/lib/
 cd build
