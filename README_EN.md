@@ -24,6 +24,12 @@ How to use：
 
 important update log:
 ---
+> 2024-03-07 :
+> * Release EASY-EAI-Toolkit-3588-0.0.6
+> * update Solution
+>     * [new] rtspServer
+>     * [new] rtspIPCamera
+>
 > 2024-03-01 :
 > * Release EASY-EAI-Toolkit-3588-0.0.5
 > * update UiSolution
