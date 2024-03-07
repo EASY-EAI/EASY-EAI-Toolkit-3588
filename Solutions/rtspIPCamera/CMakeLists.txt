@@ -27,10 +27,6 @@ set(common_root    ${toolkit_root}/common)
 
 include (${common_root}/system_opt/api.cmake)
 include (${common_root}/gst_opt/api.cmake)
-include (${common_root}/log_manager/api.cmake)
-include (${common_root}/framequeue/api.cmake)
-include (${common_root}/codec/api.cmake)
-include (${common_root}/rtsp/api.cmake)
 ## api头文件路径
 set(api_inc 
     ${SYSOPT_INCLUDE_DIRS} 

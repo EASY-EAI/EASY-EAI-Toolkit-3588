@@ -101,15 +101,6 @@ int main(int argc, char **argv)
         snprintf(strVideoEncoder, sizeof(strVideoEncoder), "mpp%senc", SrcCfg_tab[index].videoDesc.videoDstType);
         memset(strVideoPayload, 0, sizeof(strVideoPayload));
         snprintf(strVideoPayload, sizeof(strVideoPayload), "rtp%spay", SrcCfg_tab[index].videoDesc.videoDstType);
-#if 0
-        if(0 == strcmp(SrcCfg_tab[index].videoDesc.videoDstType, "h265")){
-            snprintf(strVideoEncoder, sizeof(strVideoEncoder), "mpph265enc");
-            snprintf(strVideoPayload, sizeof(strVideoPayload), "rtph265pay");
-        }else{  //default: h264
-            snprintf(strVideoEncoder, sizeof(strVideoEncoder), "mpph264enc");
-            snprintf(strVideoPayload, sizeof(strVideoPayload), "rtph264pay");
-        }
-#endif
         str = g_strdup_printf("appsrc name=videosrc ! %s ! %s name=pay0 pt=96", strVideoEncoder, strVideoPayload);
         gst_rtsp_media_factory_set_launch(factory, str);
         g_free(str);
