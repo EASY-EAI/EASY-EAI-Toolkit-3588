@@ -22,6 +22,16 @@
 
 重要更新：
 ---
+> 2024-05-20 :
+> * 发布 EASY-EAI-Toolkit-3588-0.0.7
+> * 更新 easyeai-api
+>     * 算法组件api
+>         * [更新] car_detect
+>         * [新增] person_detect
+> * 更新【Api单例】
+>     * [更新] algorithm-car
+>     * [新增] algorithm-person
+>
 > 2024-03-07 :
 > * 发布 EASY-EAI-Toolkit-3588-0.0.6
 > * 更新【开发实例】

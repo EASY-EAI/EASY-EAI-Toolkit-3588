@@ -2,7 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include <stdio.h>
 #include <sys/time.h>
-#include"car_detect.h"
+#include"person_detect.h"
 
 using namespace cv;
 using namespace std;
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 
 	/* 算法模型初始化 */
 	rknn_context ctx;
-	car_detect_init(&ctx, model_path);
+	person_detect_init(&ctx, model_path);
 
 	/* 算法运行 */
 	cv::Mat src;
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 
 	gettimeofday(&start,NULL); 
 
-	car_detect_run(ctx, src, &detect_result_group);
+	person_detect_run(ctx, src, &detect_result_group);
 
 	gettimeofday(&end,NULL);
 	time_use=(end.tv_sec-start.tv_sec)*1000000+(end.tv_usec-start.tv_usec);//微秒
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 
 
 	/* 算法模型空间释放 */
-	car_detect_release(ctx);
+	person_detect_release(ctx);
 
 	return 0;
 }

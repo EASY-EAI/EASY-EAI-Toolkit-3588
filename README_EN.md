@@ -24,6 +24,16 @@ How to use：
 
 important update log:
 ---
+> 2024-05-20 :
+> * Release EASY-EAI-Toolkit-3588-0.0.7
+> * update easyeai-api
+>     * algorithm_api
+>         * [update] car_detect
+>         * [new] person_detect
+> * update Demo
+>     * [update] algorithm-car
+>     * [new] algorithm-person
+>
 > 2024-03-07 :
 > * Release EASY-EAI-Toolkit-3588-0.0.6
 > * update Solution
