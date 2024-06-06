@@ -22,6 +22,16 @@
 
 重要更新：
 ---
+> 2024-06-06 :
+> * 发布 EASY-EAI-Toolkit-3588-0.0.8
+> * 更新 easyeai-api
+>     * 算法组件api
+>         * [新增] face_detect
+>         * [新增] face_recognition
+> * 更新【Api单例】
+>     * [新增] algorithm-face_detect
+>     * [新增] algorithm-face_recognition
+>
 > 2024-05-20 :
 > * 发布 EASY-EAI-Toolkit-3588-0.0.7
 > * 更新 easyeai-api

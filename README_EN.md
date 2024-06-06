@@ -24,6 +24,16 @@ How to use：
 
 important update log:
 ---
+> 2024-06-06 :
+> * Release EASY-EAI-Toolkit-3588-0.0.8
+> * update easyeai-api
+>     * algorithm_api
+>         * [new] face_detect
+>         * [new] face_recognition
+> * update Demo
+>     * [new] algorithm-face_detect
+>     * [new] algorithm-face_recognition
+>
 > 2024-05-20 :
 > * Release EASY-EAI-Toolkit-3588-0.0.7
 > * update easyeai-api
