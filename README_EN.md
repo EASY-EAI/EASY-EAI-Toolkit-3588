@@ -24,6 +24,20 @@ How to use：
 
 important update log:
 ---
+> 2024-07-02 :
+> * Release EASY-EAI-Toolkit-3588-0.0.9
+> * update easyeai-api
+>     * algorithm_api
+>         * [new] fire_detect
+>         * [new] helmet_detect
+>         * [new] ocr
+>         * [new] qrdecode
+> * update Demo
+>     * [new] algorithm-fire
+>     * [new] algorithm-helmet
+>     * [new] algorithm-ocr
+>     * [new] algorithm-qrdecode
+>
 > 2024-06-06 :
 > * Release EASY-EAI-Toolkit-3588-0.0.8
 > * update easyeai-api

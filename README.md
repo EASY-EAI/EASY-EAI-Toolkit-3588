@@ -22,6 +22,20 @@
 
 重要更新：
 ---
+> 2024-07-02 :
+> * 发布 EASY-EAI-Toolkit-3588-0.0.9
+> * 更新 easyeai-api
+>     * 算法组件api
+>         * [新增] fire_detect
+>         * [新增] helmet_detect
+>         * [新增] ocr
+>         * [新增] qrdecode
+> * 更新【Api单例】
+>     * [新增] algorithm-fire
+>     * [新增] algorithm-helmet
+>     * [新增] algorithm-ocr
+>     * [新增] algorithm-qrdecode
+>
 > 2024-06-06 :
 > * 发布 EASY-EAI-Toolkit-3588-0.0.8
 > * 更新 easyeai-api
