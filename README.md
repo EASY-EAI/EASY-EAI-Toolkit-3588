@@ -22,6 +22,11 @@
 
 重要更新：
 ---
+> 2024-12-12 :
+> * 发布 EASY-EAI-Toolkit-3588-0.0.10
+> * 更新【开发实例】
+>     * [删除] rtspServer
+>
 > 2024-07-02 :
 > * 发布 EASY-EAI-Toolkit-3588-0.0.9
 > * 更新 easyeai-api

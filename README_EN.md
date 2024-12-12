@@ -2,7 +2,7 @@
 <br/>
 
 
-[中文](README_CN.md)
+[中文](README.md)
 
 <br />
 <br />
@@ -24,6 +24,11 @@ How to use：
 
 important update log:
 ---
+> 2024-12-12 :
+> * Release EASY-EAI-Toolkit-3588-0.0.10
+> * update Solution
+>     * [del] rtspServer
+>
 > 2024-07-02 :
 > * Release EASY-EAI-Toolkit-3588-0.0.9
 > * update easyeai-api

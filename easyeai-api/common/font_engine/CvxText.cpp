@@ -65,7 +65,7 @@ void CvxText::setFont(int* type, cv::Scalar* size, bool* underline, float* diaph
 {
     // 参数合法性检查
     if (type) {
-        if(type >= 0) m_fontType = *type;
+        if(*type >= 0) m_fontType = *type;
     }
     if (size) {
         m_fontSize.val[0] = std::fabs(size->val[0]);

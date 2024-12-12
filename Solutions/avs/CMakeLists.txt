@@ -83,14 +83,14 @@ find_package(OpenCV REQUIRED)
 ##       pkg_search_module: 只要第一个模块存在，就能生效
 
 find_package(PkgConfig)
-pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+#pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 #pkg_search_module(GST1.0 REQUIRED gstreamer-1.0)
 #pkg_check_modules(GST1.0_VIDEO REQUIRED gstreamer-video-1.0)
 
 # -I
 set(custom_inc
     ${OpenCV_INCLUDE_DIRS} 
-    ${GTK3_INCLUDE_DIRS} 
+    #${GTK3_INCLUDE_DIRS} 
     #${GST1.0_INCLUDE_DIRS} 
     #${GST1.0_VIDEO_INCLUDE_DIRS} 
     ${PROJECT_SOURCE_DIR}/include
@@ -104,7 +104,7 @@ link_directories(
 set(custom_libs
     rga 
     ${OpenCV_LIBS} 
-    ${GTK3_LIBRARIES} 
+    #${GTK3_LIBRARIES} 
     #${GST1.0_LIBRARIES} 
     #${GST1.0_VIDEO_LIBRARIES} 
 )
