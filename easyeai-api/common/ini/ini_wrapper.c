@@ -129,7 +129,7 @@ int32_t ini_write_int(const char *file, const char *pSection, const char *pKey, 
 int32_t ini_write_string(const char *file, const char *pSection, const char *pKey, const char *pStr)
 {
     int32_t ret = -1;
-#if 1    //可不要。注释掉就是没有文件则强制创建
+#if 0    //可不要。注释掉就是没有文件则强制创建
     //文件是否存在
     if (access(file, F_OK) == -1)
         return ret;

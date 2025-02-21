@@ -12,7 +12,7 @@ int main(void)
 	printf("current timeval  = %lu s\n", get_timeval_s());
 	printf("current timeStamp = %d\n", get_time_stamp());
 	uint32_t curDate = 0, curTime = 0;
-	set_system_date_time(2021, 12, 03, 11, 07, 06);
+	set_system_date_time(2023, 12, 21, 02, 25, 21);
 	get_system_date_time(&curDate, &curTime);
 	printf("[string] current date = %u, time = %u\n", curDate, curTime);
 	
