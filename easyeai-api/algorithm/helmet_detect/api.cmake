@@ -14,7 +14,7 @@ set(HELMET_DETECT_INCLUDE_DIRS
 # c/c++ flags
 set(HELMET_DETECT_LIBS 
     helmet_detect
-    rknn_api 
+    rknnrt 
     ${OpenCV_LIBS} 
     pthread
     )

@@ -14,7 +14,7 @@ set(PERSON_DETECT_INCLUDE_DIRS
 # c/c++ flags
 set(PERSON_DETECT_LIBS 
     person_detect
-    rknn_api 
+    rknnrt 
     ${OpenCV_LIBS} 
     pthread
     )

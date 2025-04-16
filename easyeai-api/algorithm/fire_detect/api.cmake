@@ -14,7 +14,7 @@ set(FIREDETECT_INCLUDE_DIRS
 # c/c++ flags
 set(FIREDETECT_LIBS 
     fire_detect
-    rknn_api 
+    rknnrt 
     ${OpenCV_LIBS} 
     pthread
     )

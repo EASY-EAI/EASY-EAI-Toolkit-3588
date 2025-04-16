@@ -15,11 +15,14 @@ cmake-out/
 # project files
 prj/
 Demos/*/Release/test-*
+Demos/*/Release/result.jpg
+Demos/*/Release/*.model
 Solutions/*/Release
 .qmake.stash
 UiSolutions/*/Release
 UiSolutions/*/*.user
 UiSolutions/*/Makefile
+
 
 logCfg
 

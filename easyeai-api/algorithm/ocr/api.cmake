@@ -14,7 +14,7 @@ set(OCR_INCLUDE_DIRS
 # c/c++ flags
 set(OCR_LIBS 
     ocr
-    rknn_api
+    rknnrt
     ${OpenCV_LIBS} 
     pthread
     )

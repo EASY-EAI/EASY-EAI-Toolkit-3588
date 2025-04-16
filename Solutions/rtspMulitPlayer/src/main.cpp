@@ -14,9 +14,9 @@
 static const SrcCfg_t SrcCfg_tab[] = {
 	{
         .srcType   = "rtsp",
-        .loaction  = "rtsp://admin:a12345678@192.168.3.73",
-        .videoEncType = "h265",
-        .audioEncType = "pcma",
+        .loaction  = "rtsp://admin:a12345678@192.168.1.66",
+        .videoEncType = "h264",
+        .audioEncType = "null",
 	}, {
 		.srcType   = "rtsp",
 		.loaction  = "rtsp://admin:a12345678@192.168.1.67",

@@ -34,6 +34,7 @@ make -j24
 
 # make Release files
 if [ -d "../config" ]; then
+    rm "../Release/config" -r
     mv "../config" "../Release"
 fi
 mkdir -p "../Release/8x_equirectangular/avs_mesh"

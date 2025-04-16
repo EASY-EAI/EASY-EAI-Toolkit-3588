@@ -14,7 +14,7 @@ set(CARDETECT_INCLUDE_DIRS
 # c/c++ flags
 set(CARDETECT_LIBS 
     car_detect
-    rknn_api 
+    rknnrt 
     ${OpenCV_LIBS} 
     pthread
     )

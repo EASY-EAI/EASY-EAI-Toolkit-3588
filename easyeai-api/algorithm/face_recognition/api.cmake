@@ -14,7 +14,7 @@ set(FACE_RECOGNITION_INCLUDE_DIRS
 # c/c++ flags
 set(FACE_RECOGNITION_LIBS 
     face_recognition
-    rknn_api
+    rknnrt
     ${OpenCV_LIBS} 
     pthread
     )
