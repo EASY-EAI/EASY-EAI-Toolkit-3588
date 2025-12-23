@@ -26,6 +26,8 @@ static void appSrc_Init(gpointer data)
     int camIndex = atoi(str+strlen(str)-2);
     if(0 == mipicamera_init(camIndex, pSourceCfg->videoDesc.width, pSourceCfg->videoDesc.height, 0)){
         mipicamera_set_format(camIndex, RK_FORMAT_YCbCr_420_SP);
+        pSourceCfg->videoDesc.timestamp = 0;
+
         pSourceCfg->videoDesc.bInited = TRUE;
     }
 }
