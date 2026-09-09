@@ -24,6 +24,32 @@ How to use：
 
 important update log:
 ---
+> 2026-09-09 :
+> * Release EASY-EAI-Toolkit-3588-0.1.0
+> * update easyeai-api
+>     * common_api
+>         * [remove] http
+>         * [remove] mqtt
+>         * [remove] modbus
+>         * [remove] gst_opt
+>         * [update] ini_wrapper(src: ini)
+>     * media_api
+>         * [new] gst_opt
+>     * netProtocol_api
+>         * [new] http
+>         * [new] mqtt
+>         * [new] modbus
+> * update Demo
+>     * [update] netProtocol-http(src: common-http)
+>     * [update] netProtocol-mqtt(src: common-mqtt)
+>     * [update] netProtocol-modbus(src: common-modbus)
+> * update Solution
+>     * [update] avs
+>     * [update] rtspIPCamera
+>     * [update] rtspMulitPlayer
+> * update UiSolution
+>     * [update] QDemo
+>
 > 2024-12-12 :
 > * Release EASY-EAI-Toolkit-3588-0.0.10
 > * update Solution

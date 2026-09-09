@@ -26,7 +26,7 @@ int car_detect_run(rknn_context ctx, cv::Mat input_image, detect_result_group_t 
 
 
 /* 
- * 车辆检测放函数
+ * 车辆检测释放函数
  * ctx:输入参数,rknn_context句柄
  */
 int car_detect_release(rknn_context ctx);

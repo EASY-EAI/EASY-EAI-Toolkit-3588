@@ -22,13 +22,15 @@ add_definitions(-Wall -Wpointer-arith)
 
 # ======================== easyeai_api =========================
 set(toolkit_root ${CMAKE_CURRENT_SOURCE_DIR}/../../easyeai-api)
-set(algorithm_root ${toolkit_root}/algorithm)
+set(algorithm_root   ${toolkit_root}/algorithm)
+set(netProtocol_root ${toolkit_root}/netProtocol)
 set(common_root    ${toolkit_root}/common)
+set(media_root     ${toolkit_root}/media)
 
 include (${common_root}/base64/api.cmake)
 include (${common_root}/system_opt/api.cmake)
-include (${common_root}/rk_mpi/api.cmake)
-include (${common_root}/gst_opt/api.cmake)
+include (${media_root}/rk_mpi/api.cmake)
+include (${media_root}/gst_opt/api.cmake)
 ## api头文件路径
 set(api_inc 
     ${BASE64_INCLUDE_DIRS} 
@@ -58,7 +60,15 @@ set(sysLib_list
 # ========================== custom ============================
 # solution project
 ## 在/usr/share/cmake-3.18/Modules/目录下的Find*.cmake，都能通过这种方式被找到
-find_package(OpenCV REQUIRED)
+#find_package(OpenCV REQUIRED)
+set(OpenCV_INCLUDE_DIRS
+    ${CMAKE_SYSROOT}/usr/include/ 
+    ${CMAKE_SYSROOT}/usr/include/opencv4/ 
+)
+set(OpenCV_LIBS_DIRS
+    ${CAMKE_SYSROOT}/usr/lib/aarch64-linux-gnu/lapack
+    ${CAMKE_SYSROOT}/usr/lib/aarch64-linux-gnu/blas
+)
 
 ## 在/usr/lib/aarch64-linux-gnu/pkgconfig/下的pc文件，都可以通过这种方式查找
 ## 用法：

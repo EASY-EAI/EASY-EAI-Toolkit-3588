@@ -24,30 +24,28 @@ fi
 # build this project
 rm -rf build
 mkdir build
-sudo cp ./lib64/librockit.so /usr/lib/
-sudo cp ./lib64/librkgfx_avs.so /usr/lib/
-sudo cp ./lib64/libgraphic_lsf.so /usr/lib/
-sudo cp ./lib64/libpanoStitchApp.so /usr/lib/
+sudo cp ./lib64/librockit.so $SYSROOT/usr/lib/
+sudo cp ./lib64/librkgfx_avs.so $SYSROOT/usr/lib/
+sudo cp ./lib64/libgraphic_lsf.so $SYSROOT/usr/lib/
+sudo cp ./lib64/libpanoStitchApp.so $SYSROOT/usr/lib/
 cd build
 cmake ..
 make -j24
 
 # make Release files
-if [ -d "../config" ]; then
-    rm "../Release/config" -r
-    mv "../config" "../Release"
-fi
-mkdir -p "../Release/8x_equirectangular/avs_mesh"
-mkdir -p "../Release/8x_equirectangular/output_res"
-
-mkdir -p "../Release/6x_rectlinear/avs_mesh"
-mkdir -p "../Release/6x_rectlinear/output_res"
-
-mkdir -p "../Release/4x_qr/output_res"
-
-mkdir -p "../Release/6x_hor_ver/output_res"
-
 mkdir -p "../Release" && cp $CUR_DIR_NAME "../Release"
 chmod 777 ../Release -R
+
+if [ -d "../config" ]; then
+#    rm "../Release/config" -r || true
+    cp ../config/* -r ../Release/
+fi
+
+#mkdir -p "../Release/8x_equirectangular/avs_mesh"
+#mkdir -p "../Release/8x_equirectangular/output_res"
+#mkdir -p "../Release/6x_rectlinear/avs_mesh"
+#mkdir -p "../Release/6x_rectlinear/output_res"
+#mkdir -p "../Release/4x_qr/output_res"
+#mkdir -p "../Release/6x_hor_ver/output_res"
 
 exit 0

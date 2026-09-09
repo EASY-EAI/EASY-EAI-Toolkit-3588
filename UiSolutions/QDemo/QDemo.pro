@@ -39,6 +39,7 @@ LIBS += -lm -lpthread
 # opencv
 INCLUDEPATH += $$(SYSROOT)/usr/include/opencv4
 #LIBS += $$system(pkg-config --libs-only-l opencv4)
+#LIBS += -lopencv_core -lopencv_imgproc -lopencv_imgcodecs
 
 QMAKE_CXXFLAGS += -fpermissive -Wall
 

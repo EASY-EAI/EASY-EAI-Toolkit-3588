@@ -22,6 +22,32 @@
 
 重要更新：
 ---
+> 2026-09-09 :
+> * 发布 EASY-EAI-Toolkit-3588-0.1.0
+> * 更新 easyeai-api
+>     * 通用组件api
+>         * [移除] http
+>         * [移除] mqtt
+>         * [移除] modbus
+>         * [移除] gst_opt
+>         * [更新] ini_wrapper(原:ini)
+>     * 多媒体组件api
+>         * [新增] gst_opt
+>     * 网络协议组件api
+>         * [新增] http
+>         * [新增] mqtt
+>         * [新增] modbus
+> * 更新【Api单例】
+>     * [更新] netProtocol-http(原:common-http)
+>     * [更新] netProtocol-mqtt(原:common-mqtt)
+>     * [更新] netProtocol-modbus(原:common-modbus)
+> * 更新【开发实例】
+>     * [更新] avs
+>     * [更新] rtspIPCamera
+>     * [更新] rtspMulitPlayer
+> * 更新【Ui开发实例】
+>     * [更新] QDemo
+>
 > 2024-12-12 :
 > * 发布 EASY-EAI-Toolkit-3588-0.0.10
 > * 更新【开发实例】

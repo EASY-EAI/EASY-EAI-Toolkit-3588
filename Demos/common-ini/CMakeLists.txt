@@ -25,7 +25,7 @@ set(toolkit_root ${CMAKE_CURRENT_SOURCE_DIR}/../../easyeai-api)
 set(algorithm_root ${toolkit_root}/algorithm)
 set(common_root    ${toolkit_root}/common)
 
-include (${common_root}/ini/api.cmake)
+include (${common_root}/ini_wrapper/api.cmake)
 ## api头文件路径
 set(api_inc 
 #    ${CMAKE_SYSROOT}/usr/include/rkfacial 
