@@ -21,9 +21,7 @@ add_definitions(-Wall -Wpointer-arith)
 
 # ======================== easyeai_api =========================
 set(toolkit_root ${CMAKE_CURRENT_SOURCE_DIR}/../../easyeai-api)
-set(algorithm_root   ${toolkit_root}/algorithm)
-set(netProtocol_root ${toolkit_root}/netProtocol)
-set(common_root      ${toolkit_root}/common)
+set(netProtocol_root    ${toolkit_root}/netProtocol)
 
 
 include (${netProtocol_root}/modbus/api.cmake)

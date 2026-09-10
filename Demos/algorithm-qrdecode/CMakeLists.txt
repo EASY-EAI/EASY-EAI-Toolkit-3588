@@ -15,7 +15,7 @@ endif()
 
 #若要使用${CMAKE_SYSROOT}变量，project必须要在set(CMAKE_TOOLCHAIN_FILE "${HOST_DIR}/share/buildroot/toolchainfile.cmake")后面设置
 project(${CURRENT_FOLDER})
-add_definitions(-Wall -Wpointer-arith)
+
 # use c++ 11
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wall")
@@ -46,7 +46,7 @@ set(sysLib_list
     )
 
 #--------------------------
-# test-person_detect
+# test-qrdecode
 #--------------------------
 set(demoTag test-qrdecode)
 add_executable(${demoTag} ${demoTag}.cpp ${api_srcs}) #-o

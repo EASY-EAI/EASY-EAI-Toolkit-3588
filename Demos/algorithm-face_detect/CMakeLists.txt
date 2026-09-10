@@ -32,7 +32,7 @@ set(api_inc
     )
 ## api源文件路径
 file(GLOB api_srcs 
-    #${BASE64_SOURCE_DIRS} 
+    
     )
 ## api静态库文件路径
 link_directories(

@@ -17,8 +17,8 @@ endif()
 project(${CURRENT_FOLDER})
 add_definitions(-Wall -Wpointer-arith)
 # use c++ 11
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wall")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall -rpath-link")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wall -rpath-link")
 
 # ======================== easyeai_api =========================
 set(toolkit_root ${CMAKE_CURRENT_SOURCE_DIR}/../../easyeai-api)
@@ -29,10 +29,6 @@ include (${algorithm_root}/car_detect/api.cmake)
 ## api头文件路径
 set(api_inc 
     ${CARDETECT_INCLUDE_DIRS} 
-    )
-## api源文件路径
-file(GLOB api_srcs 
-    #${BASE64_SOURCE_DIRS} 
     )
 ## api静态库文件路径
 link_directories(

@@ -37,8 +37,9 @@ file(GLOB api_srcs
 #    ./*.c ./*.cpp 
     )
 ## api静态库文件路径
-#set(staticLib_objs 
-#    )
+link_directories(
+   ${FONTENGINE_LIBS_DIRS} 
+)
 ## 依赖的动态库文件
 set(sysLib_list 
     ${FONTENGINE_LIBS} 

@@ -22,9 +22,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wall -pthread")
 
 # ======================== easyeai_api =========================
 set(toolkit_root ${CMAKE_CURRENT_SOURCE_DIR}/../../easyeai-api)
-set(algorithm_root   ${toolkit_root}/algorithm)
-set(netProtocol_root ${toolkit_root}/netProtocol)
-set(common_root      ${toolkit_root}/common)
+set(netProtocol_root    ${toolkit_root}/netProtocol)
 
 include (${netProtocol_root}/http/api.cmake)
 ## api头文件路径

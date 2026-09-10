@@ -22,14 +22,11 @@ add_definitions(-Wall -Wpointer-arith)
 
 # ======================== easyeai_api =========================
 set(toolkit_root ${CMAKE_CURRENT_SOURCE_DIR}/../../easyeai-api)
-set(algorithm_root   ${toolkit_root}/algorithm)
-set(netProtocol_root ${toolkit_root}/netProtocol)
-set(common_root      ${toolkit_root}/common)
+set(netProtocol_root    ${toolkit_root}/netProtocol)
 
 include (${netProtocol_root}/mqtt/api.cmake)
 ## api头文件路径
 set(api_inc 
-#    ${CMAKE_SYSROOT}/usr/include/rkfacial 
     ${MQTT_INCLUDE_DIRS} 
     )
 ## api源文件路径
@@ -55,7 +52,7 @@ target_link_libraries(${demoTag} ${sysLib_list}) #-l
 target_include_directories(${demoTag} PRIVATE ${api_inc}) #-I
 
 #--------------------------
-# test-mqtt_publish
+# test-mqtt_subscription
 #--------------------------
 set(demoTag test-mqtt_subscription)
 add_executable(${demoTag} ${demoTag}.c ${api_srcs}) #-o

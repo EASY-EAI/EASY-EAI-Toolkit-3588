@@ -30,19 +30,20 @@ include (${common_root}/qrcode/api.cmake)
 set(api_inc 
 #    ${CMAKE_SYSROOT}/usr/include/rkfacial 
     ${QRCODE_INCLUDE_DIRS} 
-    )
+)
 ## api源文件路径
 file(GLOB api_srcs 
     ${QRCODE_SOURCE_DIRS} 
 #    ./*.c ./*.cpp 
-    )
+)
 ## api静态库文件路径
-#set(staticLib_objs 
-#    )
+link_directories(
+    ${QRCODE_LIBS_DIRS} 
+)
 ## 依赖的动态库文件
 set(sysLib_list 
     ${QRCODE_LIBS} 
-    )
+)
 
 #--------------------------
 # test-QRCode

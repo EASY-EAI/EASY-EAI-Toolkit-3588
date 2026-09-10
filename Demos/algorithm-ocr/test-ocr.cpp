@@ -36,7 +36,7 @@ int main(int argc, char **argv)
 
 	/* OCR算法检测模型&识别模型初始化 */
 	ocr_det_init("ocr-det.model", &ocr_det_ctx);
-	ocr_rec_init("ocr-ret.model", &ocr_rec_ctx);  
+	ocr_rec_init("ocr-rec.model", &ocr_rec_ctx);  
 
 	struct timeval start;
     struct timeval end;
