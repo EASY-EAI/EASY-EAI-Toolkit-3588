@@ -17,7 +17,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <drm_fourcc.h>
+
+#include "display_pixfmt.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,25 +33,25 @@ typedef struct {
 }Drmbuff_t;
 
 typedef struct {
-    int dmabuf_fd;        // 调用方导出的 DMA-BUF 文件描述符，接口只复制不接管
-    int width;            // framebuffer 宽度，单位：像素
-    int height;           // framebuffer 高度，单位：像素
-    uint32_t format;      // DRM_FORMAT_* 像素格式
-    uint32_t pitches[4];  // 各数据平面每行的字节数；RGB 用第 0 项，NV12 用前 2 项
-    uint32_t offsets[4];  // 各数据平面在 DMA-BUF 中的字节偏移，未使用项填 0
+    int dmabuf_fd;           // 调用方导出的 DMA-BUF 文件描述符，接口只复制不接管
+    int width;               // framebuffer 宽度，单位：像素
+    int height;              // framebuffer 高度，单位：像素
+    DisplayPixFmt_t format;  // SDK 像素格式
+    uint32_t pitches[4];     // 各数据平面每行的字节数；RGB 用第 0 项，NV12 用前 2 项
+    uint32_t offsets[4];     // 各数据平面在 DMA-BUF 中的字节偏移，未使用项填 0
 } DrmImportDesc_t;
 
 #define DRM_MAX_CONNECTORS 12    // 单次 DRM 初始化最多记录的连接器数量
 #define DRM_MAX_PLANES 8         // 每个连接器最多记录的可用图层数量
-#define DRM_MAX_PLANE_FORMATS 24 // 每个图层最多记录的像素格式数量（RK3588 VOP2 实测单 plane 上限为 21）
+#define DRM_MAX_PLANE_FORMATS 4  // 每个图层最多记录的像素格式数量，须不小于 DisplayPixFmt_t 的有效格式数
 #define DRM_MAX_BUFFERS 16       // 单次 DRM 初始化最多登记的显示缓冲区数量
 typedef struct {
     uint32_t id;       // DRM 图层对象 ID，供 drm_init_planes() 选择
     int type;          // 图层类型，为 DRM_PLANE_TYPE_*
-    int formatCount;   // 该图层支持的像素格式数量（RK3588 VOP2 实测为 14 或 21）
-    // 该图层支持的 DRM_FORMAT_* 像素格式列表，有效项为前 formatCount 项；
+    int formatCount;   // 该图层支持的 SDK 像素格式数量
+    // 该图层支持的 SDK 像素格式列表，有效项为前 formatCount 项；驱动上报的其它格式不登记；
     // 调用方据此按格式能力挑图层，例如是否支持 NV12、是否支持 ARGB8888 全屏画布
-    uint32_t formats[DRM_MAX_PLANE_FORMATS];
+    DisplayPixFmt_t formats[DRM_MAX_PLANE_FORMATS];
 } Display_plane_t;
 
 typedef struct {
@@ -150,19 +151,19 @@ int drm_plane_set_blend_mode(int handle, uint64_t mode);
 
 
 /**
- * @brief 按实际图像尺寸申请显示缓冲区，支持 DRM_FORMAT_ARGB8888、DRM_FORMAT_XRGB8888 和 DRM_FORMAT_NV12
+ * @brief 按实际图像尺寸申请显示缓冲区，支持 ARGB8888、XRGB8888 和 NV12
  * @param width  缓冲区宽度，单位：像素（NV12 要求为偶数）
  * @param height 缓冲区高度，单位：像素（NV12 要求为偶数）
- * @param format DRM_FORMAT_* 像素格式
+ * @param format SDK 像素格式，取 DISPLAY_PIX_FMT_* 之一
  * @return 成功返回内部缓冲区数组索引（0 至 DRM_MAX_BUFFERS-1），< 0 失败
  * @note 需在 drm_init() 成功后申请；NV12 的 UV 平面从 pFramebuffer + fbStride * height 开始；
  *       摄像头 DMA-BUF 应改用 drm_import_dmabuf() 导入
  */
-int drm_alloc_buffer(int width, int height, uint32_t format);
+int drm_alloc_buffer(int width, int height, DisplayPixFmt_t format);
 
 /**
  * @brief 导入外部 DMA-BUF 作为显示缓冲区
- * @param desc [in] 导入描述，需填好 dmabuf_fd、尺寸、格式及各平面 pitches/offsets
+ * @param desc [in] 导入描述，需填好 dmabuf_fd、尺寸、SDK 像素格式及各平面 pitches/offsets
  * @return 成功返回缓冲区索引（0 至 DRM_MAX_BUFFERS-1），< 0 失败
  * @note NV12 要求宽高为偶数、pitches[1] 非 0 且 offsets[1] 不早于 offsets[0]；
  *       导入的缓冲区不做 mmap（fbSize 为 0、pFramebuffer 为 NULL）；
@@ -188,7 +189,7 @@ int drm_get_buffer_info(int buffer_handle, Drmbuff_t *info);
 int drm_free_buffer(int buffer_handle);
 
 /**
- * @brief 将缓冲区按图层当前区域配置提交显示
+ * @brief 将缓冲区按图层当前区域配置提交显示（blocking，默认等下一个 vsync）
  * @param handle        图层索引
  * @param buffer_handle 缓冲区索引
  * @return 0 成功，< 0 失败（属性校验失败返回负错误码；atomic commit 失败返回 -1，原因见 errno）
@@ -196,6 +197,31 @@ int drm_free_buffer(int buffer_handle);
  *       NV12 还要求源区域坐标与尺寸均为偶数
  */
 int drm_commit(int handle, int buffer_handle);
+
+/**
+ * @brief 单图层 atomic commit，可指定 flags
+ * @param handle        图层索引
+ * @param buffer_handle 缓冲区索引
+ * @param flags         drmModeAtomicCommit 的 flags：
+ *                      0                      blocking（等下一个 vsync，默认）
+ *                      DRM_MODE_ATOMIC_NONBLOCK 非阻塞，立即返回；若上一次 commit
+ *                                              还没完成则返回 -EBUSY，调用方需自行重试
+ * @return 0 成功，< 0 失败
+ */
+int drm_commit_ex(int handle, int buffer_handle, uint32_t flags);
+
+/**
+ * @brief 多图层合并到一个 atomic request，一次提交
+ * @param plane_handles  图层索引数组（drm_init_planes 返回值）
+ * @param buffer_handles 缓冲区索引数组（drm_alloc_buffer / drm_import_dmabuf 返回值）
+ * @param count          数组长度
+ * @param flags          同 drm_commit_ex
+ * @return 0 成功，< 0 失败
+ * @note 一次 atomic commit 保证所有图层在同一 vsync 切换，无撕裂；
+ *       比多次独立 drm_commit（每次都等 vsync）大幅缩短帧周期
+ */
+int drm_commit_multi(const int *plane_handles, const int *buffer_handles,
+                     int count, uint32_t flags);
 
 
 #ifdef __cplusplus

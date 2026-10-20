@@ -28,6 +28,8 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "display_pixfmt.h"
+
 #define DISPLAY_WIN_REG_MAX 8 // 最多登记的窗口数量
 
 typedef struct {
@@ -45,7 +47,7 @@ typedef struct {
  *               须保持有效。仅供 CPU 软件合成使用；硬件后端（RGA/GPU）能否支持
  *               由调用方自行确认（实测板端 librga 2.1.0 对普通用户态虚拟地址不可用）。
  * - pitch_bytes: 首平面一行字节跨度（与 DRM 的 pitch 一致）。
- * - format     : 像素格式，取值由调用方与合成后端约定（如 DRM_FORMAT_* / RK_FORMAT_*）。
+ * - format     : SDK 像素格式（DisplayPixFmt_t），合成前由调用方自行映射到后端格式。
  */
 typedef struct display_frame {
     int dmabuf_fd;
@@ -54,7 +56,7 @@ typedef struct display_frame {
     int height;
     int pitch_bytes;
     int rotation;       // 顺时针旋转角度，支持 0、90、180、270 度
-    uint32_t format;
+    DisplayPixFmt_t format;
     /* 源裁剪区域（相对帧左上角），宽高 <= 0 时取整帧；用于视频局部放大、精灵图等 */
     int src_x;
     int src_y;
