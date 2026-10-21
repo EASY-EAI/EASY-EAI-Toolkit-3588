@@ -14,6 +14,7 @@
 #include <pthread.h>
 
 #include "app_log.h"
+#include "camera_mode.h"
 #include "capture.h"
 #include "drm_display.h"
 #include "gpu_util.h"
@@ -465,6 +466,9 @@ int stitch_main(int argc, char **argv)
                 g_cam_w, g_cam_h);
         return 1;
     }
+    /* 4K 模式先停止 3A、配置所选相机，再重新启动 3A。 */
+    if (camera_mode_prepare(g_cam_w, g_cam_h, g_video_nums, g_cam_count) != 0)
+        return 1;
 
     /* 队列必须先于信号处理初始化（信号处理器会广播条件变量）。 */
     for (int i = 0; i < 2; ++i) {

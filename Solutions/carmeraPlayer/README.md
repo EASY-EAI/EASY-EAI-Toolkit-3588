@@ -12,6 +12,7 @@ V4L2 / RGA / GPU / DRM 之间零拷贝流转。各源文件职责：
 | `src/ui_main.c` | UI 形态主程序：video + canvas 图层初始化，窗口布局与注册，GPU 画布合成，鼠标 SWAP 交互，双 plane atomic 提交 |
 | `src/capture.c` | 采集线程与帧队列：从 V4L2 取帧入队，显示侧消费后释放回驱动 |
 | `src/camera/mipi_camera.c` | V4L2 MPLANE 采集封装：NV12 格式协商、REQBUFS/MMAP、EXPBUF 导出 dma-buf、STREAMON，以及 poll + DQBUF/QBUF |
+| `src/camera/camera_mode.c` | 3840×2160 时停止 3A，配置所选 IMX415 的 RAW12/60 与 ISP NV12 输出，再启动 3A |
 | `src/rga_util.c` | RGA im2d 封装：两路 NV12 各缩半宽后左右拼接，支持 dma-buf fd / 虚拟地址输入 |
 | `src/gpu_util.c` | EGL/GLES2 封装：dma-buf 导入纹理、双摄拼接；UI 形态下负责整屏画布与窗口纹理合成 |
 | `src/ui_render.c` | CPU 光栅绘制 UI 窗口位图：shell 造型与透明洞、SWAP 按钮、stats 面板、光标 |
@@ -92,10 +93,14 @@ RGA / GPU 拼接后端（默认 GPU）。两个 plane 按连接器枚举的格�
 
 ## 摄像头分辨率与帧率
 
-`-w/-h` 只设置 ISP 主路径的输出尺寸（默认 1920×1080），不会改变 IMX415 的
-sensor 模式。sensor 默认 3864×2192@30fps，因此应用侧最高 30fps；
-`/dev/video44` 和 `/dev/video53` 不支持 `VIDIOC_S_PARM`，用户态请求 60fps
-不起作用。需要 1080p60 时须在内核侧修改 IMX415 的默认模式。
+默认 1920×1080 仍使用内核默认的 1944×1097 RAW12/60 sensor 模式。
+指定 `-w 3840 -h 2160` 时，程序先停止 3A，再对所选 `/dev/video44`
+或 `/dev/video53` 配置 IMX415 4K RAW12/60 和 ISP NV12；配置成功后启动
+3A，再开始取流。退出程序后仍保持 4K 模式。其他尺寸仍只设置 ISP 输出。
+`VIDIOC_S_PARM` 不能改变这两个节点的 sensor 帧率。
+
+板上 `00.01.0b` 内核的 CIF 和 ISP 主路径均已实测 4K60。新程序单摄使用
+`-n 1 -L 53 -w 3840 -h 2160` 时，日志连续显示 `fps=60.0 errors=0`。
 
 ## 执行
 
@@ -106,10 +111,14 @@ sensor 模式。sensor 默认 3864×2192@30fps，因此应用侧最高 30fps；
 systemctl stop lightdm
 ```
 
+运行 4K 时，程序会自动停止 3A、切换模式，并在配置成功后启动 3A。
+退出程序后仍保持 4K 模式；再次运行 4K 时会重复这一切换流程。
+
 无 UI 版本：
 
 ```sh
 ./carmeraPlayer -n 1              # 单摄直显
+./carmeraPlayer -n 1 -L 53 -w 3840 -h 2160  # 第二路 4K60 单摄直显
 ./carmeraPlayer -n 2 -C gpu      # 双摄 GPU 拼接
 ./carmeraPlayer -n 2 -C rga      # 双摄 RGA 拼接
 ```
@@ -120,6 +129,15 @@ UI 版本：
 ./carmeraPlayer                  # 双摄 + UI
 ./carmeraPlayer -m               # 单摄镜像 + UI
 ./carmeraPlayer -C rga           # RGA 拼接 + UI
+```
+
+如需恢复第二路 1080p，退出程序后手动执行：
+
+```sh
+systemctl stop rkaiq_3A.service
+media-ctl -d /dev/media3 -V '"m01_b_imx415 7-0036":0[fmt:SGBRG12_1X12/1944x1097]'
+v4l2-ctl -d /dev/video53 --set-fmt-video=width=1920,height=1080,pixelformat=NV12
+systemctl start rkaiq_3A.service
 ```
 
 退出后恢复桌面：

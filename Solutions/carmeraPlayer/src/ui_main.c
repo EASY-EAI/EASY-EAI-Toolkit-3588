@@ -16,6 +16,7 @@
 #include <drm_mode.h>
 
 #include "app_log.h"
+#include "camera_mode.h"
 #include "capture.h"
 #include "display_win.h"
 #include "drm_display.h"
@@ -364,6 +365,8 @@ int ui_main(int argc, char **argv)
         default: print_usage(argv[0]); return 0;
         }
     }
+    if (camera_mode_prepare(cam_w, cam_h, g_video_nums, g_mirror ? 1 : 2) != 0)
+        return 1;
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
 
