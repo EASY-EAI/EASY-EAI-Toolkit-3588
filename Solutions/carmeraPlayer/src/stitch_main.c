@@ -14,7 +14,7 @@
 #include <pthread.h>
 
 #include "app_log.h"
-#include "camera_mode.h"
+#include "camera_discover.h"
 #include "capture.h"
 #include "drm_display.h"
 #include "gpu_util.h"
@@ -27,7 +27,8 @@
  *              不经过 RGA / GPU。
  * -n 2         ：取两路 camera，各自缩到一半宽度后左右拼接为 cam_w x cam_h
  *              （如 1920x1080 + 1920x1080 → 960x1080 + 960x1080 → 1920x1080），
- *              由 -C 选择 RGA / GPU 合成，结果写入同一个 DRM 图层。
+ *              由 -C 选择 RGA / GPU 合成，结果写入 DRM 图层。输出使用
+ *              2 块 buffer 轮转：DRM 扫描一块时合成线程写另一块，避免撕裂。
  */
 
 typedef enum {
@@ -40,7 +41,8 @@ log_handle_t g_log = LOG_HANDLE_INVALID;
 
 static CaptureState g_capture[2];
 static bool g_cap_started[2];
-static int g_video_nums[2] = { 44, 53 };
+/* 负值表示运行时自动发现：按 sensor 名排序后的 live ISP mainpath。 */
+static int g_video_nums[2] = { -1, -1 };
 static int g_cam_count = 1;
 static int g_cam_w = 1920;
 static int g_cam_h = 1080;
@@ -52,8 +54,11 @@ static int g_conn_index = -1;
 static int g_screen_w;
 static int g_screen_h;
 static int g_video_plane = -1;
-static int g_video_buf = -1;
-static Drmbuff_t g_video_info;
+/* 双摄输出缓冲：双缓冲轮转，避免 DRM 扫描期间被下一帧覆盖导致撕裂。 */
+#define VIDEO_BUF_COUNT 2
+static int g_video_bufs[VIDEO_BUF_COUNT] = { -1, -1 };
+static Drmbuff_t g_video_infos[VIDEO_BUF_COUNT];
+static int g_video_buf_idx;
 static int g_video_w;                 /* 拼接输出宽；单摄模式不使用 */
 static int g_video_h;
 static bool g_gpu_inited;
@@ -72,7 +77,6 @@ static void on_signal(int sig)
     for (int i = 0; i < 2; ++i) {
         g_capture[i].running = false;
         pthread_cond_broadcast(&g_capture[i].queue.not_empty);
-        pthread_cond_broadcast(&g_capture[i].queue.not_full);
     }
 }
 
@@ -91,7 +95,8 @@ static void print_usage(const char *name)
            "  -n 2  dual cameras -> scale each to half width, side-by-side\n"
            "        into cam_w x cam_h on one DRM plane\n"
            "  -C    dual compose backend: rga | gpu (default gpu)\n"
-           "  -L/-R /dev/videoN for camera 0/1 (default 44/53)\n"
+           "  -L/-R /dev/videoN override for camera 0/1\n"
+           "        (default: auto-detect live ISP mainpaths, sorted by sensor)\n"
            "  -w/-h per-camera capture size (default 1920/1080)\n",
            name);
 }
@@ -169,35 +174,40 @@ static void v4l2_to_gpu(const V4l2Frame *in, GpuBuffer *out)
     out->format = GPU_FMT_NV12;
 }
 
-static void video_to_rga(RgaBuffer *out)
+static void video_to_rga(int idx, RgaBuffer *out)
 {
+    const Drmbuff_t *info = &g_video_infos[idx];
+
     memset(out, 0, sizeof(*out));
     out->width = g_video_w;
     out->height = g_video_h;
-    out->wstride = nv12_wstride_px(g_video_info.fbStride, g_video_w);
+    out->wstride = nv12_wstride_px(info->fbStride, g_video_w);
     out->hstride = g_video_h;
     out->format = RGA_FMT_YCbCr_420_SP;
-    if (g_video_info.dmabuf_fd >= 0) {
+    if (info->dmabuf_fd >= 0) {
         out->mem_type = RGA_MEM_FD;
-        out->fd = g_video_info.dmabuf_fd;
+        out->fd = info->dmabuf_fd;
     } else {
         out->mem_type = RGA_MEM_VIR;
-        out->vir = g_video_info.pFramebuffer;
+        out->vir = info->pFramebuffer;
     }
 }
 
-static void video_to_gpu_argb(GpuBuffer *out)
+static void video_to_gpu_argb(int idx, GpuBuffer *out)
 {
+    const Drmbuff_t *info = &g_video_infos[idx];
+
     memset(out, 0, sizeof(*out));
-    out->fd = g_video_info.dmabuf_fd;
+    out->fd = info->dmabuf_fd;
     out->width = g_video_w;
     out->height = g_video_h;
-    out->stride = g_video_info.fbStride;
+    out->stride = info->fbStride;
     out->format = GPU_FMT_ARGB8888;
 }
 
-/* 按 -C 选定的后端把两路各缩半宽后拼接，失败不回退。 */
-static int compose_side_by_side(const V4l2Frame *left, const V4l2Frame *right)
+/* 按 -C 选定的后端把两路各缩半宽后拼接到第 idx 块输出缓冲，失败不回退。 */
+static int compose_side_by_side(const V4l2Frame *left, const V4l2Frame *right,
+                                int idx)
 {
     RgaBuffer rga_l, rga_r, rga_d;
     GpuBuffer gpu_l, gpu_r, gpu_d;
@@ -206,12 +216,12 @@ static int compose_side_by_side(const V4l2Frame *left, const V4l2Frame *right)
     case COMPOSE_RGA:
         v4l2_to_rga(left, &rga_l);
         v4l2_to_rga(right, &rga_r);
-        video_to_rga(&rga_d);
+        video_to_rga(idx, &rga_d);
         return rga_compose_side_by_side(&rga_l, &rga_r, &rga_d, 0);
     case COMPOSE_GPU:
         v4l2_to_gpu(left, &gpu_l);
         v4l2_to_gpu(right, &gpu_r);
-        video_to_gpu_argb(&gpu_d);
+        video_to_gpu_argb(idx, &gpu_d);
         return gpu_compose_side_by_side(&gpu_l, &gpu_r, &gpu_d, 0);
     default:
         return -1;
@@ -257,15 +267,19 @@ static int setup_video_plane(DisplayPixFmt_t format, int alloc_w, int alloc_h)
 
     g_video_w = alloc_w;
     g_video_h = alloc_h;
-    g_video_buf = drm_alloc_buffer(g_video_w, g_video_h, format);
-    if (g_video_buf < 0) {
-        LOG_E("drm_alloc_buffer(%dx%d, fmt=%d) failed\n", g_video_w, g_video_h, format);
-        return -1;
+    for (int i = 0; i < VIDEO_BUF_COUNT; ++i) {
+        g_video_bufs[i] = drm_alloc_buffer(g_video_w, g_video_h, format);
+        if (g_video_bufs[i] < 0) {
+            LOG_E("drm_alloc_buffer(%dx%d, fmt=%d) failed\n",
+                  g_video_w, g_video_h, format);
+            return -1;
+        }
+        if (drm_get_buffer_info(g_video_bufs[i], &g_video_infos[i]) != 0) {
+            LOG_E("drm_get_buffer_info failed\n");
+            return -1;
+        }
     }
-    if (drm_get_buffer_info(g_video_buf, &g_video_info) != 0) {
-        LOG_E("drm_get_buffer_info failed\n");
-        return -1;
-    }
+    g_video_buf_idx = 0;
     drm_plane_set_src_region(g_video_plane, 0, 0, g_video_w, g_video_h);
 
     int x, y, w, h;
@@ -323,6 +337,20 @@ static int import_single_frame(const V4l2Frame *f)
     return buf;
 }
 
+/* 取当前最新帧；积压的旧帧直接归还驱动，避免延迟随队列深度累积。 */
+static int pop_latest_frame(CaptureState *c, V4l2Frame *frame)
+{
+    V4l2Frame newer;
+
+    if (frame_queue_pop(&c->queue, frame) != 0)
+        return -1;
+    while (frame_queue_try_pop(&c->queue, &newer) == 0) {
+        capture_release_frame(c, frame);
+        *frame = newer;
+    }
+    return 0;
+}
+
 /* 单摄：camera NV12 dma-buf 直接导入 DRM 图层，零拷贝显示。 */
 static void run_single(void)
 {
@@ -335,7 +363,7 @@ static void run_single(void)
         V4l2Frame f;
         int ret = -1;
 
-        if (frame_queue_pop(&g_capture[0].queue, &f) != 0)
+        if (pop_latest_frame(&g_capture[0], &f) != 0)
             continue;
 
         if (f.dma_fd < 0) {
@@ -369,7 +397,7 @@ static void run_single(void)
     }
 }
 
-/* 双摄：RGA / GPU 各缩半宽拼接到固定输出缓冲，再提交同一个 DRM 图层。 */
+/* 双摄：RGA / GPU 各缩半宽拼接到当前输出缓冲，提交后切到另一块。 */
 static void run_dual(void)
 {
     int64_t frames = 0;
@@ -379,16 +407,17 @@ static void run_dual(void)
 
     while (!g_quit) {
         V4l2Frame left, right;
+        int idx = g_video_buf_idx;
         int ret;
 
-        if (frame_queue_pop(&g_capture[0].queue, &left) != 0)
+        if (pop_latest_frame(&g_capture[0], &left) != 0)
             continue;
-        if (frame_queue_pop(&g_capture[1].queue, &right) != 0) {
+        if (pop_latest_frame(&g_capture[1], &right) != 0) {
             capture_release_frame(&g_capture[0], &left);
             continue;
         }
 
-        ret = compose_side_by_side(&left, &right);
+        ret = compose_side_by_side(&left, &right, idx);
         capture_release_frame(&g_capture[0], &left);
         capture_release_frame(&g_capture[1], &right);
 
@@ -399,9 +428,11 @@ static void run_dual(void)
                 compose_failed = true;
             }
             errors++;
-        } else if (drm_commit(g_video_plane, g_video_buf) != 0) {
+        } else if (drm_commit(g_video_plane, g_video_bufs[idx]) != 0) {
             errors++;
         } else {
+            /* 提交成功才换缓冲：上一块已上屏，下一帧安全写另一块。 */
+            g_video_buf_idx = idx ^ 1;
             frames++;
         }
         log_stats("dual", &frames, &errors, &last);
@@ -417,7 +448,6 @@ static void stop_capture(void)
     for (int i = 0; i < 2; ++i) {
         g_capture[i].running = false;
         pthread_cond_broadcast(&g_capture[i].queue.not_empty);
-        pthread_cond_broadcast(&g_capture[i].queue.not_full);
     }
     for (int i = 0; i < 2; ++i) {
         if (g_cap_started[i]) {
@@ -431,6 +461,38 @@ static void stop_capture(void)
             capture_release_frame(&g_capture[i], &f);
         capture_deinit(&g_capture[i]);
     }
+}
+
+/* 按 media 拓扑选路：-L/-R 为显式覆盖，未指定的槽位由 live mainpath 补齐。 */
+static int resolve_cameras(int need)
+{
+    CameraPath paths[CAMERA_PATH_MAX];
+    int count = camera_paths_discover(paths, CAMERA_PATH_MAX);
+
+    if (count < 0) {
+        LOG_E("camera discovery failed\n");
+        return -1;
+    }
+    for (int i = 0; i < count; ++i)
+        LOG_I("live camera[%d]: /dev/video%d sensor=%s cif=%s (media%d)\n",
+              i, paths[i].video_num, paths[i].sensor, paths[i].cif,
+              paths[i].media_num);
+
+    if (camera_paths_assign(paths, count, g_video_nums, need) != 0) {
+        LOG_E("found %d live ISP mainpath(s), need %d; check links or use -L/-R\n",
+              count, need);
+        return -1;
+    }
+    for (int i = 0; i < need; ++i) {
+        bool live = false;
+
+        for (int j = 0; j < count; ++j)
+            if (paths[j].video_num == g_video_nums[i])
+                live = true;
+        LOG_I("camera%d: /dev/video%d%s\n", i, g_video_nums[i],
+              live ? "" : " (explicit override, not live)");
+    }
+    return 0;
 }
 
 int stitch_main(int argc, char **argv)
@@ -466,8 +528,16 @@ int stitch_main(int argc, char **argv)
                 g_cam_w, g_cam_h);
         return 1;
     }
-    /* 4K 模式先停止 3A、配置所选相机，再重新启动 3A。 */
-    if (camera_mode_prepare(g_cam_w, g_cam_h, g_video_nums, g_cam_count) != 0)
+
+    {
+        log_mgr_t mgr = log_manager_init("/userdata/logs/cameraStitchPlayer.ini");
+        if (mgr != LOG_MGR_INVALID)
+            g_log = log_register(mgr, "cameraStitchPlayer");
+        if (g_log == LOG_HANDLE_INVALID)
+            fprintf(stderr, "log_manager_pro init failed, logging disabled\n");
+    }
+
+    if (resolve_cameras(g_cam_count) != 0)
         return 1;
 
     /* 队列必须先于信号处理初始化（信号处理器会广播条件变量）。 */
@@ -480,14 +550,6 @@ int stitch_main(int argc, char **argv)
     }
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
-
-    {
-        log_mgr_t mgr = log_manager_init("/userdata/logs/cameraStitchPlayer.ini");
-        if (mgr != LOG_MGR_INVALID)
-            g_log = log_register(mgr, "cameraStitchPlayer");
-        if (g_log == LOG_HANDLE_INVALID)
-            fprintf(stderr, "log_manager_pro init failed, logging disabled\n");
-    }
 
     if (drm_init(&g_disp) != 0) {
         LOG_E("drm_init failed\n");
@@ -524,9 +586,11 @@ int stitch_main(int argc, char **argv)
             goto cleanup;
 
         if (g_compose == COMPOSE_GPU) {
-            if (g_video_info.dmabuf_fd < 0) {
-                LOG_E("gpu compose requires video buffer dma-buf FD\n");
-                goto cleanup;
+            for (int i = 0; i < VIDEO_BUF_COUNT; ++i) {
+                if (g_video_infos[i].dmabuf_fd < 0) {
+                    LOG_E("gpu compose requires video buffer dma-buf FD\n");
+                    goto cleanup;
+                }
             }
             if (gpu_composer_init() != 0) {
                 LOG_E("gpu_composer_init failed\n");
@@ -576,8 +640,9 @@ cleanup:
         gpu_composer_deinit();
     for (int i = 0; i < g_single_buf_count; ++i)
         drm_free_buffer(g_single_bufs[i]);
-    if (g_video_buf >= 0)
-        drm_free_buffer(g_video_buf);
+    for (int i = 0; i < VIDEO_BUF_COUNT; ++i)
+        if (g_video_bufs[i] >= 0)
+            drm_free_buffer(g_video_bufs[i]);
     if (g_video_plane >= 0)
         drm_uninit_planes(g_video_plane);
     if (g_drm_inited)

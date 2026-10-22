@@ -10,24 +10,28 @@ void frame_queue_init(FrameQueue *q)
     memset(q, 0, sizeof(*q));
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->not_empty, NULL);
-    pthread_cond_init(&q->not_full, NULL);
 }
 
 void frame_queue_destroy(FrameQueue *q)
 {
     pthread_mutex_destroy(&q->lock);
     pthread_cond_destroy(&q->not_empty);
-    pthread_cond_destroy(&q->not_full);
 }
 
-int frame_queue_push(FrameQueue *q, const V4l2Frame *frame)
+int frame_queue_push(FrameQueue *q, const V4l2Frame *frame, V4l2Frame *stale)
 {
+    stale->index = -1;
+
     pthread_mutex_lock(&q->lock);
-    while (q->count == QUEUE_CAP && !g_quit)
-        pthread_cond_wait(&q->not_full, &q->lock);
     if (g_quit) {
         pthread_mutex_unlock(&q->lock);
         return -1;
+    }
+    if (q->count == QUEUE_CAP) {
+        *stale = q->slots[q->head].frame;
+        q->slots[q->head].valid = false;
+        q->head = (q->head + 1) % QUEUE_CAP;
+        q->count--;
     }
     q->slots[q->tail].frame = *frame;
     q->slots[q->tail].valid = true;
@@ -61,9 +65,24 @@ int frame_queue_pop(FrameQueue *q, V4l2Frame *frame)
     q->slots[q->head].valid = false;
     q->head = (q->head + 1) % QUEUE_CAP;
     q->count--;
-    pthread_cond_signal(&q->not_full);
     pthread_mutex_unlock(&q->lock);
     return 0;
+}
+
+int frame_queue_try_pop(FrameQueue *q, V4l2Frame *frame)
+{
+    int ret = -1;
+
+    pthread_mutex_lock(&q->lock);
+    if (q->count > 0) {
+        *frame = q->slots[q->head].frame;
+        q->slots[q->head].valid = false;
+        q->head = (q->head + 1) % QUEUE_CAP;
+        q->count--;
+        ret = 0;
+    }
+    pthread_mutex_unlock(&q->lock);
+    return ret;
 }
 
 int capture_init(CaptureState *c)
@@ -95,11 +114,15 @@ void *capture_thread(void *arg)
 {
     CaptureState *c = arg;
     while (c->running && !g_quit) {
-        V4l2Frame frame;
+        V4l2Frame frame, stale;
         if (mipicamera_acquire(c->video_num, &frame, 1000) != 0)
             continue;
-        if (frame_queue_push(&c->queue, &frame) != 0)
+        if (frame_queue_push(&c->queue, &frame, &stale) != 0) {
             mipicamera_release(c->video_num, &frame);
+            continue;
+        }
+        if (stale.index >= 0)
+            mipicamera_release(c->video_num, &stale);
     }
     return NULL;
 }

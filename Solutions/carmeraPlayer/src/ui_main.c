@@ -16,7 +16,7 @@
 #include <drm_mode.h>
 
 #include "app_log.h"
-#include "camera_mode.h"
+#include "camera_discover.h"
 #include "capture.h"
 #include "display_win.h"
 #include "drm_display.h"
@@ -28,7 +28,8 @@
 
 /**
  * 本 demo 只用两个真实 DRM 图层：
- *   - video plane：双摄左右拼接后的视频（-C gpu 时 ARGB8888，-C rga 时 NV12）
+ *   - video plane：双摄半宽拼接或 -m 单摄整幅视频（-C gpu 时 ARGB8888，
+ *     -C rga 时 NV12）
  *   - canvas plane：整屏 ARGB8888 画布，由 GPU 把下面的窗口帧贴上去
  * 其余内容不再各占一个硬件图层，而是登记为 display_win 窗口：
  *   shell（整屏显示器造型，含屏幕透明洞）/ stats / button / cursor。
@@ -66,18 +67,18 @@ typedef struct {
 volatile sig_atomic_t g_quit;
 log_handle_t g_log = LOG_HANDLE_INVALID;
 static CaptureState g_capture[2];
-static bool g_mirror;
+static bool g_single;
 static ComposeMode g_compose = COMPOSE_GPU;
 
-/* Default: cam0=/dev/video44 (rkisp0-vir0), cam1=/dev/video53 (rkisp0-vir1). */
-static int g_video_nums[2] = { 44, 53 };
+/* 负值表示运行时自动发现：按 sensor 名排序后的 live ISP mainpath。 */
+static int g_video_nums[2] = { -1, -1 };
 
 static Display_dev_t g_disp;
 static int g_conn_index = -1;
 static Layout g_layout;
 static int g_width;                 /* 连接器分辨率（画布尺寸） */
 static int g_height;
-static int g_video_w;               /* 拼接视频尺寸 = cam_w * 2 */
+static int g_video_w;               /* 视频输出尺寸 = cam_w（每路半宽） */
 static int g_video_h;
 static int g_video_plane = -1;
 static int g_canvas_plane = -1;
@@ -97,7 +98,6 @@ static void on_signal(int sig)
     for (int i = 0; i < 2; ++i) {
         g_capture[i].running = false;
         pthread_cond_broadcast(&g_capture[i].queue.not_empty);
-        pthread_cond_broadcast(&g_capture[i].queue.not_full);
     }
 }
 
@@ -105,6 +105,9 @@ static void print_usage(const char *name)
 {
     printf("%s [-w cam_w] [-h cam_h] [-m] [-C rga|gpu]\n"
            "  [-L left_video_num] [-R right_video_num]\n"
+           "  -m: single camera, full-frame video (default: dual half-width).\n"
+           "  -L/-R: override left/right camera node\n"
+           "      (default: auto-detect live ISP mainpaths, sorted by sensor).\n"
            "  -C: side-by-side compose backend (default gpu, no CPU fallback).\n"
            "      rga/gpu 互不回退。\n"
            "  UI layer: 2 real DRM planes (video + full-screen ARGB canvas);\n"
@@ -232,6 +235,26 @@ static int compose_side_by_side(const V4l2Frame *left, const V4l2Frame *right, i
     }
 }
 
+/* -m 单摄：整帧铺满视频输出，不做左右分屏。 */
+static int compose_single(const V4l2Frame *src)
+{
+    RgaBuffer rga_s, rga_d;
+    GpuBuffer gpu_s, gpu_d;
+
+    switch (g_compose) {
+    case COMPOSE_RGA:
+        v4l2_to_rga(src, &rga_s);
+        video_to_rga(&rga_d);
+        return rga_compose_single(&rga_s, &rga_d);
+    case COMPOSE_GPU:
+        v4l2_to_gpu(src, &gpu_s);
+        info_to_gpu_argb(&g_video_info, g_video_w, g_video_h, &gpu_d);
+        return gpu_compose_single(&gpu_s, &gpu_d);
+    default:
+        return -1;
+    }
+}
+
 /* 申请一个图层：初始化 plane 与缓冲区并读取缓冲区信息。 */
 static int init_plane(int *plane, int *buffer, Drmbuff_t *info, uint32_t plane_id,
                       int width, int height, DisplayPixFmt_t format)
@@ -332,6 +355,48 @@ static int win_register(WinFrame *f, int zpos, int x, int y, int w, int h)
     return 0;
 }
 
+/* 按 media 拓扑选路：-L/-R 为显式覆盖，只有一路 live 时退回单摄模式。 */
+static int resolve_cameras(void)
+{
+    CameraPath paths[CAMERA_PATH_MAX];
+    int count = camera_paths_discover(paths, CAMERA_PATH_MAX);
+    int need = g_single ? 1 : 2;
+
+    if (count < 0) {
+        LOG_E("camera discovery failed\n");
+        return -1;
+    }
+    for (int i = 0; i < count; ++i)
+        LOG_I("live camera[%d]: /dev/video%d sensor=%s cif=%s (media%d)\n",
+              i, paths[i].video_num, paths[i].sensor, paths[i].cif,
+              paths[i].media_num);
+
+    if (camera_paths_assign(paths, count, g_video_nums, need) != 0) {
+        if (g_single || count == 0) {
+            LOG_E("found %d live ISP mainpath(s), need %d; check links or use -L/-R\n",
+                  count, need);
+            return -1;
+        }
+        LOG_W("only one live ISP mainpath, falling back to single camera mode\n");
+        g_single = true;
+        need = 1;
+        if (camera_paths_assign(paths, count, g_video_nums, need) != 0) {
+            LOG_E("no usable camera node\n");
+            return -1;
+        }
+    }
+    for (int i = 0; i < need; ++i) {
+        bool live = false;
+
+        for (int j = 0; j < count; ++j)
+            if (paths[j].video_num == g_video_nums[i])
+                live = true;
+        LOG_I("camera%d: /dev/video%d%s\n", i, g_video_nums[i],
+              live ? "" : " (explicit override, not live)");
+    }
+    return 0;
+}
+
 int ui_main(int argc, char **argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -352,7 +417,7 @@ int ui_main(int argc, char **argv)
         switch (opt) {
         case 'w': cam_w = atoi(optarg); break;
         case 'h': cam_h = atoi(optarg); break;
-        case 'm': g_mirror = true; break;
+        case 'm': g_single = true; break;
         case 'C':
             if (parse_compose_mode(optarg, &g_compose) != 0) {
                 LOG_E("invalid -C %s (want rga|gpu)\n", optarg);
@@ -365,11 +430,6 @@ int ui_main(int argc, char **argv)
         default: print_usage(argv[0]); return 0;
         }
     }
-    if (camera_mode_prepare(cam_w, cam_h, g_video_nums, g_mirror ? 1 : 2) != 0)
-        return 1;
-    signal(SIGINT, on_signal);
-    signal(SIGTERM, on_signal);
-
     /* 接入 log_manager_pro：注册本进程模块句柄，供 LOG_* 宏输出。 */
     {
         log_mgr_t mgr = log_manager_init("/userdata/logs/vo_drm_2plane_4win.ini");
@@ -379,6 +439,9 @@ int ui_main(int argc, char **argv)
             fprintf(stderr, "log_manager_pro init failed, logging disabled\n");
     }
 
+    if (resolve_cameras() != 0)
+        return 1;
+
     for (int i = 0; i < 2; ++i) {
         memset(&g_capture[i], 0, sizeof(g_capture[i]));
         frame_queue_init(&g_capture[i].queue);
@@ -386,8 +449,11 @@ int ui_main(int argc, char **argv)
         g_capture[i].width = cam_w;
         g_capture[i].height = cam_h;
     }
+    signal(SIGINT, on_signal);
+    signal(SIGTERM, on_signal);
 
-    g_video_w = cam_w * 2;
+    /* 双摄各缩半宽拼成一路分辨率；-m 单摄整幅输出同一尺寸。 */
+    g_video_w = cam_w;
     g_video_h = cam_h;
 
     /* 初始化 DRM 设备并挑选已启用的连接器。 */
@@ -541,14 +607,14 @@ int ui_main(int argc, char **argv)
         LOG_E("V4L2 init /dev/video%d failed\n", g_capture[0].video_num);
         goto fail_drm;
     }
-    if (!g_mirror && capture_init(&g_capture[1]) != 0) {
-        LOG_E("V4L2 camera1 /dev/video%d unavailable, use camera0 mirror mode\n",
+    if (!g_single && capture_init(&g_capture[1]) != 0) {
+        LOG_E("V4L2 camera1 /dev/video%d unavailable, use single camera mode\n",
                 g_capture[1].video_num);
-        g_mirror = true;
+        g_single = true;
     }
     if (pthread_create(&g_capture[0].thread, NULL, capture_thread, &g_capture[0]) != 0)
         goto fail_cap;
-    if (!g_mirror && pthread_create(&g_capture[1].thread, NULL, capture_thread, &g_capture[1]) != 0)
+    if (!g_single && pthread_create(&g_capture[1].thread, NULL, capture_thread, &g_capture[1]) != 0)
         goto fail_cap;
 
     DemoStats stats = { .display_w = g_width, .display_h = g_height,
@@ -564,6 +630,8 @@ int ui_main(int argc, char **argv)
         V4l2Frame right;
         int cx_click, cy_click;
         GpuBuffer canvas_gpu;
+        int composed;
+        bool ok = false;
 
         clock_gettime(CLOCK_MONOTONIC, &ts_t0);
 
@@ -575,20 +643,20 @@ int ui_main(int argc, char **argv)
         if (frame_queue_pop(&g_capture[0].queue, &left) != 0)
             continue;
         clock_gettime(CLOCK_MONOTONIC, &ts_t1);
-        bool have_right = g_mirror;
-        if (g_mirror) {
-            right = left;
-        } else if (frame_queue_pop(&g_capture[1].queue, &right) != 0) {
+        if (!g_single &&
+            frame_queue_pop(&g_capture[1].queue, &right) != 0) {
             capture_release_frame(&g_capture[0], &left);
             continue;
         }
         clock_gettime(CLOCK_MONOTONIC, &ts_t2);
 
-        /* rga/gpu: compose_side_by_side 失败不回退。 */
-        if (compose_side_by_side(&left, &right, swap ? 1 : 0) == 0) {
+        /* -m 单摄整幅；双摄各缩半宽后左右拼接。-C 失败均不回退。 */
+        composed = g_single ? compose_single(&left)
+                            : compose_side_by_side(&left, &right, swap ? 1 : 0);
+        if (composed == 0) {
             int vw, vh, vx, vy;
             int cx, cy;
-            bool ok;
+            bool stats_ready;
             int chns[DISPLAY_WIN_REG_MAX];
             int nwin, i;
 
@@ -602,8 +670,9 @@ int ui_main(int argc, char **argv)
             vy = g_layout.screen_y + (g_layout.screen_h - vh) / 2;
             drm_plane_set_crtc_region(g_video_plane, vx, vy, vw, vh);
 
-            /* stats 约一秒刷新一次 */
-            if (stats_update(&stats_ctx, &stats, frames)) {
+            /* stats 约一秒刷新一次，fps 日志在 commit 之后输出。 */
+            stats_ready = stats_update(&stats_ctx, &stats, frames) != 0;
+            if (stats_ready) {
                 draw_stats(&g_win[WIN_STATS].canvas, &stats);
                 gpu_ui_flush();
             }
@@ -662,33 +731,34 @@ int ui_main(int argc, char **argv)
                 t_pop0 = (ts_t1.tv_sec-ts_t0.tv_sec)*1e3 + (ts_t1.tv_nsec-ts_t0.tv_nsec)/1e6;
                 t_pop1 = (ts_t2.tv_sec-ts_t1.tv_sec)*1e3 + (ts_t2.tv_nsec-ts_t1.tv_nsec)/1e6;
                 t_commit = (ts_t3.tv_sec-ts_t2.tv_sec)*1e3 + (ts_t3.tv_nsec-ts_t2.tv_nsec)/1e6;
-                if (stats_update(&stats_ctx, &stats, frames)) {
+                if (stats_ready) {
                     double now = ts_t3.tv_sec + ts_t3.tv_nsec/1e9;
                     static double last_t = 0;
-                    if (last_t > 0) t_total = (now - last_t) * 1000.0;
+                    if (last_t > 0) {
+                        t_total = (now - last_t) * 1000.0;
+                        LOG_I("%s: fps=%.1f pop0=%.1fms pop1=%.1fms commit=%.1fms total=%.1fms frames=%lu\n",
+                              g_single ? "single" : "dual", stats.fps,
+                              t_pop0, t_pop1, t_commit, t_total, frames);
+                    }
                     last_t = now;
-                    LOG_I("fps=%.1f pop0=%.1fms pop1=%.1fms commit=%.1fms total=%.1fms frames=%lu\n",
-                          stats.fps, t_pop0, t_pop1, t_commit, t_total, frames);
                 }
                 ok = (commit_ret == 0);
             }
-
-            /* GPU 完成后立即释放 V4L2 buffer，不等 commit 完成 —— dma-buf 已导入 DRM plane */
-            capture_release_frame(&g_capture[0], &left);
-            if (!have_right)
-                capture_release_frame(&g_capture[1], &right);
-            if (ok)
-                frames++;
         }
+
+        /* GPU 完成后立即释放 V4L2 buffer，不等 commit 完成 —— dma-buf 已导入 DRM plane */
+        capture_release_frame(&g_capture[0], &left);
+        if (!g_single)
+            capture_release_frame(&g_capture[1], &right);
+        if (ok)
+            frames++;
     }
 
 fail_cap:
     for (int i = 0; i < 2; ++i)
         g_capture[i].running = false;
     pthread_cond_broadcast(&g_capture[0].queue.not_empty);
-    pthread_cond_broadcast(&g_capture[0].queue.not_full);
     pthread_cond_broadcast(&g_capture[1].queue.not_empty);
-    pthread_cond_broadcast(&g_capture[1].queue.not_full);
     if (g_capture[0].thread)
         pthread_join(g_capture[0].thread, NULL);
     if (g_capture[1].thread)

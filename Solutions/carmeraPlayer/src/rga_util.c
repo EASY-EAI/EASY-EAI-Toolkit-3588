@@ -154,3 +154,22 @@ int rga_compose_side_by_side(const RgaBuffer *left, const RgaBuffer *right,
     }
     return 0;
 }
+
+int rga_compose_single(const RgaBuffer *src, RgaBuffer *dst)
+{
+    rga_buffer_t rsrc, rdst;
+    im_rect srect, drect;
+
+    if (!g_rga_ready || !buffer_ok(src) || !buffer_ok(dst))
+        return -1;
+    if (to_rga_buffer(src, &rsrc) != 0 || to_rga_buffer(dst, &rdst) != 0)
+        return -1;
+
+    memset(&srect, 0, sizeof(srect));
+    memset(&drect, 0, sizeof(drect));
+    srect.width = src->width;
+    srect.height = src->height;
+    drect.width = dst->width;
+    drect.height = dst->height;
+    return rga_blit_rect(&rsrc, &srect, &rdst, &drect);
+}

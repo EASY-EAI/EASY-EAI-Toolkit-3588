@@ -13,12 +13,14 @@
  *   - gpu_compose_side_by_side：输入 NV12 dma-buf，输出 ARGB8888 dma-buf
  *     （GLES 不能直接写 NV12）；左半屏采样左路整帧、右半屏采样右路整帧，
  *     每路按半边尺寸自动缩放；
+ *   - gpu_compose_single：单路整帧铺满输出，用于 -m 单摄模式；
  *   - gpu_ui_*：把窗口帧的 ARGB8888 dma-buf 导入为纹理，按窗口矩形贴到全屏
  *     画布的 FBO 上；画布再作为显示 plane 上屏，screen 洞区域保留 alpha=0，
  *     由 plane 混合透出下层视频。
  *
  * 资源复用：
- *   - side-by-side 输出 (dst) 的 FBO+tex+EGLImage 在首次调用时创建，后续复用；
+ *   - 拼接 / 单摄输出 (dst) 的 FBO+tex+EGLImage 按 dma_fd 缓存，双缓冲时
+ *     两块输出缓冲各有一份，避免每帧重建；
  *   - 输入 NV12 按 dma_fd 缓存 EGLImage+texture（V4L2 BUF_COUNT=4，
  *     两路共 8 个 fd，GPU_NV12_CACHE_MAX=8 足够）；
  *   - UI canvas (gpu_ui_begin 的 dst) 的 FBO+tex+EGLImage 首次创建后复用；
@@ -67,6 +69,9 @@ void gbm_device_destroy(struct gbm_device *gbm);
 /* NV12 输入缓存上限：两路相机各 BUF_COUNT=4 → 最多 8 个不同 dma_fd。 */
 #define GPU_NV12_CACHE_MAX 8
 
+/* 输出 dma-buf → FBO 缓存：双缓冲交替写入 2 个 dst fd，留 2 个余量。 */
+#define GPU_DST_CACHE_MAX 4
+
 #ifdef ENABLE_UI
 /* 常驻 UI 纹理上限：shell/button/stats/cursor 各一，留余量。 */
 #define GPU_UI_TEX_MAX 8
@@ -84,25 +89,32 @@ typedef struct {
     EGLImageKHR img;
 } Nv12CacheEntry;
 
+/* ARGB dma-buf → {EGLImage, texture, FBO} 缓存条目。 */
+typedef struct {
+    int fd;                 /* -1 = 空闲 */
+    int w, h;
+    GLuint tex;
+    EGLImageKHR img;
+    GLuint fbo;
+} DstCacheEntry;
+
 typedef struct {
     int drm_fd;
     struct gbm_device *gbm;
     EGLDisplay dpy;
     EGLContext ctx;
     GLuint prog;
+    GLuint prog_single;
     GLuint vbo;
     GLuint loc_tex0;
     GLuint loc_tex1;
+    GLuint loc_single_tex0;
     PFNEGLCREATEIMAGEKHRPROC create_image;
     PFNEGLDESTROYIMAGEKHRPROC destroy_image;
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC image_target_tex;
 
-    /* side-by-side 输出持久资源（dst 固定 buffer，首次调用时创建）。 */
-    GLuint sbs_fbo;
-    GLuint sbs_tex_dst;
-    EGLImageKHR sbs_img_dst;
-    int sbs_dst_fd;         /* -1 = 未初始化 */
-    int sbs_dst_w, sbs_dst_h;
+    /* side-by-side / single 输出资源，按 dst dma_fd 缓存。 */
+    DstCacheEntry dst_cache[GPU_DST_CACHE_MAX];
 
     Nv12CacheEntry nv12_cache[GPU_NV12_CACHE_MAX];
 
@@ -144,12 +156,22 @@ static const char *k_fs =
     "varying vec2 v_uv;\n"
     "void main(){\n"
     "  if (v_uv.x < 0.5) {\n"
-    "    vec2 uv = vec2(v_uv.x * 2.0, 1.0 - v_uv.y);\n"
+    "    vec2 uv = vec2(v_uv.x * 2.0, v_uv.y);\n"
     "    gl_FragColor = texture2D(u_tex0, uv);\n"
     "  } else {\n"
-    "    vec2 uv = vec2((v_uv.x - 0.5) * 2.0, 1.0 - v_uv.y);\n"
+    "    vec2 uv = vec2((v_uv.x - 0.5) * 2.0, v_uv.y);\n"
     "    gl_FragColor = texture2D(u_tex1, uv);\n"
     "  }\n"
+    "}\n";
+
+/* 单路整帧铺满输出（-m 单摄模式）。 */
+static const char *k_fs_single =
+    "#extension GL_OES_EGL_image_external : require\n"
+    "precision mediump float;\n"
+    "uniform samplerExternalOES u_tex0;\n"
+    "varying vec2 v_uv;\n"
+    "void main(){\n"
+    "  gl_FragColor = texture2D(u_tex0, v_uv);\n"
     "}\n";
 
 #ifdef ENABLE_UI
@@ -344,67 +366,95 @@ static void nv12_cache_destroy_all(void)
     }
 }
 
-/* ---------------- side-by-side 输出持久资源 ---------------- */
+/* ---------------- 输出 dma-buf 持久资源 ---------------- */
 
-static int sbs_init_dst(const GpuBuffer *dst)
+static void dst_cache_destroy_entry(DstCacheEntry *e)
 {
-    g_gpu.sbs_img_dst = import_argb(dst);
-    if (g_gpu.sbs_img_dst == EGL_NO_IMAGE_KHR) {
-        LOG_E("gpu: sbs dst eglCreateImageKHR failed 0x%x\n", eglGetError());
+    if (e->fbo) {
+        glDeleteFramebuffers(1, &e->fbo);
+        e->fbo = 0;
+    }
+    if (e->tex) {
+        glDeleteTextures(1, &e->tex);
+        e->tex = 0;
+    }
+    if (e->img != EGL_NO_IMAGE_KHR && g_gpu.destroy_image) {
+        g_gpu.destroy_image(g_gpu.dpy, e->img);
+        e->img = EGL_NO_IMAGE_KHR;
+    }
+    e->fd = -1;
+    e->w = e->h = 0;
+}
+
+static int dst_cache_init_entry(DstCacheEntry *e, const GpuBuffer *dst)
+{
+    e->img = import_argb(dst);
+    if (e->img == EGL_NO_IMAGE_KHR) {
+        LOG_E("gpu: dst eglCreateImageKHR failed 0x%x\n", eglGetError());
         return -1;
     }
-    glGenTextures(1, &g_gpu.sbs_tex_dst);
-    glBindTexture(GL_TEXTURE_2D, g_gpu.sbs_tex_dst);
+    glGenTextures(1, &e->tex);
+    glBindTexture(GL_TEXTURE_2D, e->tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    g_gpu.image_target_tex(GL_TEXTURE_2D, g_gpu.sbs_img_dst);
+    g_gpu.image_target_tex(GL_TEXTURE_2D, e->img);
     if (glGetError() != GL_NO_ERROR) {
-        LOG_E("gpu: sbs dst bind tex failed\n");
-        glDeleteTextures(1, &g_gpu.sbs_tex_dst);
-        g_gpu.sbs_tex_dst = 0;
-        g_gpu.destroy_image(g_gpu.dpy, g_gpu.sbs_img_dst);
-        g_gpu.sbs_img_dst = EGL_NO_IMAGE_KHR;
+        LOG_E("gpu: dst bind tex failed\n");
         return -1;
     }
-    glGenFramebuffers(1, &g_gpu.sbs_fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.sbs_fbo);
+    glGenFramebuffers(1, &e->fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, e->fbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                           GL_TEXTURE_2D, g_gpu.sbs_tex_dst, 0);
+                           GL_TEXTURE_2D, e->tex, 0);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        LOG_E("gpu: sbs FBO incomplete 0x%x\n",
+        LOG_E("gpu: dst FBO incomplete 0x%x\n",
                 glCheckFramebufferStatus(GL_FRAMEBUFFER));
-        glDeleteFramebuffers(1, &g_gpu.sbs_fbo);
-        g_gpu.sbs_fbo = 0;
-        glDeleteTextures(1, &g_gpu.sbs_tex_dst);
-        g_gpu.sbs_tex_dst = 0;
-        g_gpu.destroy_image(g_gpu.dpy, g_gpu.sbs_img_dst);
-        g_gpu.sbs_img_dst = EGL_NO_IMAGE_KHR;
         return -1;
     }
-    g_gpu.sbs_dst_fd = dst->fd;
-    g_gpu.sbs_dst_w = dst->width;
-    g_gpu.sbs_dst_h = dst->height;
+    e->fd = dst->fd;
+    e->w = dst->width;
+    e->h = dst->height;
     return 0;
 }
 
-static void sbs_deinit_dst(void)
+/* 取 dst 对应的 FBO 条目；双缓冲时两个 fd 各占一条，首次使用时创建。 */
+static DstCacheEntry *dst_cache_get(const GpuBuffer *dst)
 {
-    if (g_gpu.sbs_fbo) {
-        glDeleteFramebuffers(1, &g_gpu.sbs_fbo);
-        g_gpu.sbs_fbo = 0;
+    DstCacheEntry *slot = NULL;
+
+    for (int i = 0; i < GPU_DST_CACHE_MAX; ++i) {
+        DstCacheEntry *e = &g_gpu.dst_cache[i];
+
+        if (e->fbo && e->fd == dst->fd && e->w == dst->width &&
+            e->h == dst->height)
+            return e;
     }
-    if (g_gpu.sbs_tex_dst) {
-        glDeleteTextures(1, &g_gpu.sbs_tex_dst);
-        g_gpu.sbs_tex_dst = 0;
+    for (int i = 0; i < GPU_DST_CACHE_MAX; ++i) {
+        if (!g_gpu.dst_cache[i].fbo) {
+            slot = &g_gpu.dst_cache[i];
+            break;
+        }
     }
-    if (g_gpu.sbs_img_dst != EGL_NO_IMAGE_KHR && g_gpu.destroy_image) {
-        g_gpu.destroy_image(g_gpu.dpy, g_gpu.sbs_img_dst);
-        g_gpu.sbs_img_dst = EGL_NO_IMAGE_KHR;
+    if (!slot) {
+        LOG_E("gpu: dst cache full (all %d entries in use)\n",
+                GPU_DST_CACHE_MAX);
+        return NULL;
     }
-    g_gpu.sbs_dst_fd = -1;
-    g_gpu.sbs_dst_w = g_gpu.sbs_dst_h = 0;
+
+    dst_cache_destroy_entry(slot);
+    if (dst_cache_init_entry(slot, dst) != 0) {
+        dst_cache_destroy_entry(slot);
+        return NULL;
+    }
+    return slot;
+}
+
+static void dst_cache_destroy_all(void)
+{
+    for (int i = 0; i < GPU_DST_CACHE_MAX; ++i)
+        dst_cache_destroy_entry(&g_gpu.dst_cache[i]);
 }
 
 int gpu_composer_init(void)
@@ -423,10 +473,11 @@ int gpu_composer_init(void)
     };
 
     memset(&g_gpu, 0, sizeof(g_gpu));
-    g_gpu.sbs_dst_fd = -1;
 #ifdef ENABLE_UI
     g_gpu.ui_dst_fd = -1;
 #endif
+    for (int i = 0; i < GPU_DST_CACHE_MAX; ++i)
+        g_gpu.dst_cache[i].fd = -1;
     for (int i = 0; i < GPU_NV12_CACHE_MAX; ++i)
         g_gpu.nv12_cache[i].fd = -1;
 
@@ -504,6 +555,11 @@ int gpu_composer_init(void)
     g_gpu.loc_tex0 = glGetUniformLocation(g_gpu.prog, "u_tex0");
     g_gpu.loc_tex1 = glGetUniformLocation(g_gpu.prog, "u_tex1");
 
+    g_gpu.prog_single = link_program(k_vs, k_fs_single);
+    if (!g_gpu.prog_single)
+        goto fail;
+    g_gpu.loc_single_tex0 = glGetUniformLocation(g_gpu.prog_single, "u_tex0");
+
     glGenBuffers(1, &g_gpu.vbo);
     glBindBuffer(GL_ARRAY_BUFFER, g_gpu.vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
@@ -531,7 +587,7 @@ void gpu_composer_deinit(void)
     if (g_gpu.dpy != EGL_NO_DISPLAY)
         eglMakeCurrent(g_gpu.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     if (g_gpu.ctx != EGL_NO_CONTEXT) {
-        sbs_deinit_dst();
+        dst_cache_destroy_all();
         nv12_cache_destroy_all();
 #ifdef ENABLE_UI
         for (int i = 0; i < GPU_UI_TEX_MAX; ++i) {
@@ -562,6 +618,8 @@ void gpu_composer_deinit(void)
 #endif
         if (g_gpu.vbo)
             glDeleteBuffers(1, &g_gpu.vbo);
+        if (g_gpu.prog_single)
+            glDeleteProgram(g_gpu.prog_single);
         if (g_gpu.prog)
             glDeleteProgram(g_gpu.prog);
     }
@@ -576,10 +634,11 @@ void gpu_composer_deinit(void)
     memset(&g_gpu, 0, sizeof(g_gpu));
     /* 置 -1 以区分「未打开」，避免重复 deinit 时误关 fd 0。 */
     g_gpu.drm_fd = -1;
-    g_gpu.sbs_dst_fd = -1;
 #ifdef ENABLE_UI
     g_gpu.ui_dst_fd = -1;
 #endif
+    for (int i = 0; i < GPU_DST_CACHE_MAX; ++i)
+        g_gpu.dst_cache[i].fd = -1;
     for (int i = 0; i < GPU_NV12_CACHE_MAX; ++i)
         g_gpu.nv12_cache[i].fd = -1;
 }
@@ -589,6 +648,7 @@ int gpu_compose_side_by_side(const GpuBuffer *left, const GpuBuffer *right,
 {
     const GpuBuffer *frames[2];
     Nv12CacheEntry *entry[2] = { NULL, NULL };
+    DstCacheEntry *dst_entry;
 
     if (!g_gpu.ready || !buffer_ok(left) || !buffer_ok(right) || !buffer_ok(dst))
         return -1;
@@ -605,13 +665,9 @@ int gpu_compose_side_by_side(const GpuBuffer *left, const GpuBuffer *right,
     if (!eglMakeCurrent(g_gpu.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, g_gpu.ctx))
         return -1;
 
-    /* dst buffer 固定不变（drm_alloc_buffer 分配的），首次创建后复用。 */
-    if (g_gpu.sbs_dst_fd != dst->fd || g_gpu.sbs_dst_w != dst->width ||
-        g_gpu.sbs_dst_h != dst->height) {
-        sbs_deinit_dst();
-        if (sbs_init_dst(dst) != 0)
-            return -1;
-    }
+    dst_entry = dst_cache_get(dst);
+    if (!dst_entry)
+        return -1;
 
     /*
      * V4L2 只有 BUF_COUNT=4 个 buffer，dma_fd 轮转，
@@ -625,7 +681,7 @@ int gpu_compose_side_by_side(const GpuBuffer *left, const GpuBuffer *right,
         }
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.sbs_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, dst_entry->fbo);
     glViewport(0, 0, dst->width, dst->height);
     glDisable(GL_BLEND);
     glUseProgram(g_gpu.prog);
@@ -635,6 +691,54 @@ int gpu_compose_side_by_side(const GpuBuffer *left, const GpuBuffer *right,
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_EXTERNAL_OES, entry[1]->tex);
     glUniform1i(g_gpu.loc_tex1, 1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, g_gpu.vbo);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                          (void *)(2 * sizeof(float)));
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glFinish();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return 0;
+}
+
+int gpu_compose_single(const GpuBuffer *src, GpuBuffer *dst)
+{
+    Nv12CacheEntry *entry;
+    DstCacheEntry *dst_entry;
+
+    if (!g_gpu.ready || !buffer_ok(src) || !buffer_ok(dst))
+        return -1;
+    if (src->format != GPU_FMT_NV12)
+        return -1;
+    if (dst->format != GPU_FMT_ARGB8888 && dst->format != GPU_FMT_XRGB8888)
+        return -1;
+    if (dst->width <= 0 || dst->height <= 0)
+        return -1;
+
+    if (!eglMakeCurrent(g_gpu.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, g_gpu.ctx))
+        return -1;
+
+    dst_entry = dst_cache_get(dst);
+    if (!dst_entry)
+        return -1;
+
+    entry = nv12_cache_get(src);
+    if (!entry) {
+        LOG_E("gpu: nv12 cache lookup failed (fd=%d)\n", src->fd);
+        return -1;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, dst_entry->fbo);
+    glViewport(0, 0, dst->width, dst->height);
+    glDisable(GL_BLEND);
+    glUseProgram(g_gpu.prog_single);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, entry->tex);
+    glUniform1i(g_gpu.loc_single_tex0, 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, g_gpu.vbo);
     glEnableVertexAttribArray(0);

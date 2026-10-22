@@ -96,8 +96,8 @@ void rga_deinit(void);
  * 源帧按各自半边尺寸自动缩放。
  *
  * 常见用法：
- *   - 无 UI 模式：dst 宽 = cam_w，每路缩为 cam_w/2（合成后仍占一路分辨率）；
- *   - UI 模式  ：dst 宽 = 2 * cam_w，每路保持原尺寸贴到左右半屏。
+ *   - dst 宽 = cam_w    ：每路缩为 cam_w/2，合成后仍占一路分辨率；
+ *   - dst 宽 = 2 * cam_w：每路保持原尺寸贴到左右半屏。
  *
  * @param left   左路输入（swap 非 0 时作为右路）
  * @param right  右路输入（swap 非 0 时作为左路）
@@ -107,6 +107,15 @@ void rga_deinit(void);
  */
 int rga_compose_side_by_side(const RgaBuffer *left, const RgaBuffer *right,
                              RgaBuffer *dst, int swap);
+
+/**
+ * 将单路画面铺满 dst，用于 UI 的 -m 单摄整幅显示（不做左右分屏）。
+ *
+ * @param src 输入缓冲
+ * @param dst 输出缓冲，由调用方预先分配
+ * @return 0 成功；负值参数非法或 RGA 操作失败
+ */
+int rga_compose_single(const RgaBuffer *src, RgaBuffer *dst);
 
 #ifdef __cplusplus
 }
