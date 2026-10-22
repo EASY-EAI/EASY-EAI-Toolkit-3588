@@ -1,4 +1,4 @@
-# carmeraPlayer
+# cameraPlayer
 
 ## 模块介绍
 
@@ -56,7 +56,7 @@ RGA 路径使用板端系统自带的 librga，无需额外安装。
 ./build.sh clear    # 清理 build/ 与 Release/
 ```
 
-产物：`Release/carmeraPlayer`。
+产物：`Release/cameraPlayer`。
 
 `ENABLE_UI` 由 CMake 选项控制，默认 OFF；`./build.sh ui` 传入
 `-DENABLE_UI=ON`。未定义时入口为 `src/stitch_main.c`，定义后入口为
@@ -119,7 +119,7 @@ mainpath 时程序直接报错，不再回退到固定节点号；UI 形态下�
 
 ## 执行
 
-将 `Release/carmeraPlayer` 放到板端目录（如 `/userdata/Soul`），在板端终端
+将 `Release/cameraPlayer` 放到板端目录（如 `/userdata/Soul`），在板端终端
 进入该目录执行。程序需要 DRM master，运行前先停止桌面：
 
 ```sh
@@ -132,19 +132,19 @@ systemctl stop lightdm
 无 UI 版本：
 
 ```sh
-./carmeraPlayer -n 1              # 单摄直显
-./carmeraPlayer -n 1 -w 3840 -h 2160        # 第一路 4K60 单摄直显
-./carmeraPlayer -n 1 -L 53 -w 3840 -h 2160  # 指定第二路（节点号以发现日志为准）
-./carmeraPlayer -n 2 -C gpu      # 双摄 GPU 拼接
-./carmeraPlayer -n 2 -C rga      # 双摄 RGA 拼接
+./cameraPlayer -n 1              # 单摄直显
+./cameraPlayer -n 1 -w 3840 -h 2160        # 第一路 4K60 单摄直显
+./cameraPlayer -n 1 -L 53 -w 3840 -h 2160  # 指定第二路（节点号以发现日志为准）
+./cameraPlayer -n 2 -C gpu      # 双摄 GPU 拼接
+./cameraPlayer -n 2 -C rga      # 双摄 RGA 拼接
 ```
 
 UI 版本：
 
 ```sh
-./carmeraPlayer                  # 双摄 + UI
-./carmeraPlayer -m               # 单摄整幅 + UI
-./carmeraPlayer -C rga           # RGA 拼接 + UI
+./cameraPlayer                  # 双摄 + UI
+./cameraPlayer -m               # 单摄整幅 + UI
+./cameraPlayer -C rga           # RGA 拼接 + UI
 ```
 
 退出后恢复桌面：
@@ -164,8 +164,8 @@ systemctl start lightdm
 | `-L` / `-R` | 全部 | 覆盖左 / 右 `/dev/videoN`；缺省自动发现并按 sensor 名排序分配 |
 
 ```sh
-carmeraPlayer -n 2 -C gpu -w 1920 -h 1080   # 双摄 GPU 拼接
-carmeraPlayer -n 2 -C rga                   # 双摄 RGA 拼接
-carmeraPlayer -m                            # UI 单摄整幅
-carmeraPlayer -L 44 -R 53                   # 显式指定左右摄像头
+cameraPlayer -n 2 -C gpu -w 1920 -h 1080   # 双摄 GPU 拼接
+cameraPlayer -n 2 -C rga                   # 双摄 RGA 拼接
+cameraPlayer -m                            # UI 单摄整幅
+cameraPlayer -L 44 -R 53                   # 显式指定左右摄像头
 ```

@@ -21,7 +21,7 @@
 #include "rga_util.h"
 
 /**
- * carmeraPlayer（无 UI 模式）
+ * cameraPlayer（无 UI 模式）
  *
  * -n 1（默认）：只取一路 camera，NV12 dma-buf 直接导入 DRM 图层显示，
  *              不经过 RGA / GPU。

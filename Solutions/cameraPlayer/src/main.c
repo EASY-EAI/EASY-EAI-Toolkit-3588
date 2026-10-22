@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 
 /**
- * carmeraPlayer 入口。
+ * cameraPlayer 入口。
  *
  * 编译开关 ENABLE_UI（CMake: -DENABLE_UI=ON）：
  *   - 定义   ：运行 ui_main，保留 shell/stats/button/cursor UI 绘制；
