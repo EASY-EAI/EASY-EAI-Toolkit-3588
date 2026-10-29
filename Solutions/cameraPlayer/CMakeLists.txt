@@ -16,29 +16,30 @@ endif()
 project(${CURRENT_FOLDER})
 add_definitions(-Wall -Wpointer-arith)
 
-# 默认不定义 ENABLE_UI：无 UI，单摄直显 / 双摄半宽拼接。
-# ./build.sh ui 或 cmake -DENABLE_UI=ON 时启用 shell/stats/button/cursor 绘制。
-option(ENABLE_UI "Enable UI overlay drawing" OFF)
-if(ENABLE_UI)
-    add_definitions(-DENABLE_UI)
-endif()
-
 # ======================== easyeai_api =========================
 set(toolkit_root ${CMAKE_CURRENT_SOURCE_DIR}/../../easyeai-api)
 set(common_root ${toolkit_root}/common)
 set(media_root ${toolkit_root}/media)
 
 include (${common_root}/system_opt/api.cmake)
-# display 模块(drm_display / display_win) 依赖 log_manager_pro 的日志接口
-# (log_manager_init / log_register / log_print)。
+# display 模块(display_pro) 与工程内显示通路监控依赖 log_manager_pro
+# 的日志接口 (log_manager_init / log_register / log_print)。
 include (${common_root}/log_manager_pro/api.cmake)
 set(api_inc
     ${SYSOPT_INCLUDE_DIRS}
     ${media_root}/display
+    ${media_root}/gpu
+    ${media_root}/rga
+    ${media_root}/camera
     ${LOGMANAGERPRO_INCLUDE_DIRS}
     )
 file(GLOB api_srcs
     ${SYSOPT_SOURCE_DIRS}
+    ${media_root}/gpu/gpu_util.c
+    ${media_root}/rga/rga_util.c
+    ${media_root}/camera/camera_discover.c
+    ${media_root}/camera/capture.c
+    ${media_root}/camera/mipi_camera.c
     )
 # 链接顺序: display 在前, log_manager_pro 在后(静态库解析依赖)。
 set(sysLib_list
@@ -55,7 +56,6 @@ link_directories(
 set(custom_inc
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
-    ${PROJECT_SOURCE_DIR}/src/camera
     ${CMAKE_SYSROOT}/usr/include/libdrm
     ${CMAKE_SYSROOT}/usr/include/rga
 )
@@ -69,9 +69,8 @@ set(custom_libs
     mali
 )
 aux_source_directory(./src dir_srcs)
-aux_source_directory(./src/camera camera_srcs)
 
-add_executable(${CURRENT_FOLDER} ${dir_srcs} ${camera_srcs} ${api_srcs})
+add_executable(${CURRENT_FOLDER} ${dir_srcs} ${api_srcs})
 target_include_directories(${CURRENT_FOLDER} PRIVATE ${custom_inc} ${api_inc})
 target_compile_options(${CURRENT_FOLDER} PRIVATE -Wextra -Wno-unused-parameter)
 target_link_libraries(${CURRENT_FOLDER} ${custom_libs} ${sysLib_list})
