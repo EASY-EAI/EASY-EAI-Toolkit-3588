@@ -85,11 +85,11 @@ int frame_queue_try_pop(FrameQueue *q, V4l2Frame *frame)
     return ret;
 }
 
-int capture_init(CaptureState *c)
+int capture_init(CaptureState *c, log_mgr_t log_mgr)
 {
     if (!c)
         return -1;
-    if (mipicamera_init(c->video_num, c->width, c->height) != 0)
+    if (mipicamera_init(c->video_num, c->width, c->height, log_mgr) != 0)
         return -1;
     c->running = true;
     return 0;

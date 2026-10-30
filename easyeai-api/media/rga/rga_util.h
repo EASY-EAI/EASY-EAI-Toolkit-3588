@@ -14,6 +14,8 @@
 extern "C" {
 #endif
 
+#include "log_manager_pro.h"
+
 /** 像素格式，数值与 RK_FORMAT_* 一致。 */
 typedef enum {
     RGA_FMT_RGBA_8888        = 0x0 << 8,
@@ -82,9 +84,11 @@ typedef struct {
 /**
  * 初始化 RGA 会话。使用其它 rga_* 接口前须先成功调用。
  *
+ * @param log_mgr 日志管理器：init 时在它下面注册本模块日志句柄（"rga"）；
+ *                传 LOG_MGR_INVALID 关闭日志
  * @return 0 成功；负值初始化失败
  */
-int rga_init(void);
+int rga_init(log_mgr_t log_mgr);
 
 /**
  * 释放 RGA 会话资源。未 init 或已 deinit 时为空操作。

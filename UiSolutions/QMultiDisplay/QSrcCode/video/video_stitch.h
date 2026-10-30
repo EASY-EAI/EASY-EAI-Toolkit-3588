@@ -35,7 +35,7 @@ typedef struct {
     unsigned long errors_total;
 } VideoStats;
 
-/** 初始化 g_log（capture/mipi_camera/gpu_util/rga_util 的 LOG_* 共用） */
+/** 初始化日志管理器并注册本模块句柄；mgr 由 video_start 传给各 media 模块 init */
 int video_log_init(const char *config_file, const char *module);
 
 /**

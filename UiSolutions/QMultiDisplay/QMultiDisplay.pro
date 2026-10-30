@@ -24,7 +24,7 @@ EASYEAI_ROOT = $$PWD/../../easyeai-api
 
 # ------------------------------------------------------------------ 子模块
 # disp   ：共享显示引擎（全进程唯一 disp_init，视频层 + UI 层，互斥提交）
-# camera ：本工程日志句柄 app_log.h + 采集/合成共享模块（media/camera 等）
+# camera ：日志入口 app_log.h + 采集/合成共享模块（media/camera 等）
 # video  ：采集/合成/视频上屏（cameraPlayer 视频通路的移植）
 # input  ：evdev 鼠标/触摸 → Qt 事件转发
 # ui     ：Qt 半透明界面（offscreen 渲染到 UI 图层显存）

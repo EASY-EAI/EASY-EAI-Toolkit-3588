@@ -16,6 +16,8 @@ extern "C" {
 
 #include <stdint.h>
 
+#include "log_manager_pro.h"
+
 /** One held NV12 capture buffer; release with mipicamera_release(). */
 typedef struct {
     int index;
@@ -30,9 +32,11 @@ typedef struct {
 /**
  * Open /dev/video<video_num>, set NV12 MPLANE, mmap REQBUFS, STREAMON.
  * 成功后对每个 buffer 尝试 VIDIOC_EXPBUF；失败时 dma_fd 为 -1，VIR 仍可用。
+ * @param log_mgr 日志管理器：init 时在它下面注册本模块日志句柄（"camera"）；
+ *                传 LOG_MGR_INVALID 关闭日志
  * @return 0 on success.
  */
-int mipicamera_init(int video_num, int width, int height);
+int mipicamera_init(int video_num, int width, int height, log_mgr_t log_mgr);
 
 /** STREAMOFF, munmap, close EXPBUF fds, close device. */
 void mipicamera_exit(int video_num);

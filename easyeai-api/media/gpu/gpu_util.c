@@ -35,9 +35,14 @@
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 
-#include "app_log.h"
 #include "gpu_internal.h"
 #include "gpu_util.h"
+
+/* GPU 模块日志句柄：gpu_composer_init 注册，gpu_ui.c 经 gpu_internal.h 共用。 */
+log_handle_t g_gpu_log = LOG_HANDLE_INVALID;
+
+#define APP_LOG_HANDLE g_gpu_log
+#include "app_log.h"
 
 #ifndef EGL_NO_CONFIG_KHR
 #define EGL_NO_CONFIG_KHR ((EGLConfig)0)
@@ -355,7 +360,7 @@ static void dst_cache_destroy_all(void)
         dst_cache_destroy_entry(&g_gpu.dst_cache[i]);
 }
 
-int gpu_composer_init(void)
+int gpu_composer_init(log_mgr_t log_mgr)
 {
     EGLint maj = 0, min = 0;
     const EGLint ctx_attr[] = {
@@ -369,6 +374,8 @@ int gpu_composer_init(void)
         -1.f,  1.f,  0.f, 1.f,
          1.f,  1.f,  1.f, 1.f,
     };
+
+    g_gpu_log = app_log_register_module(log_mgr, "gpu");
 
     memset(&g_gpu, 0, sizeof(g_gpu));
     for (int i = 0; i < GPU_DST_CACHE_MAX; ++i)

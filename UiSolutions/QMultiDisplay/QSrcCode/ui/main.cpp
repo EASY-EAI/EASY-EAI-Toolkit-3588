@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* 日志（g_log 供 capture/mipi_camera/gpu_util/rga_util 共用） */
+    /* 日志管理器 + 本模块句柄（gpu/rga/camera 在各自 init 里注册自己的句柄） */
     if (video_log_init("/userdata/logs/qmultidisplay.ini", "QMultiDisplay") != 0)
         fprintf(stderr, "log_manager_pro init failed, logging disabled\n");
 

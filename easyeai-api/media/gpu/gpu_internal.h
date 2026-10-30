@@ -12,6 +12,7 @@
 #include <GLES2/gl2ext.h>
 
 #include "gpu_util.h"
+#include "log_manager_pro.h"
 
 struct gbm_device;
 
@@ -62,6 +63,9 @@ typedef struct {
 
 /* gpu_composer_init 成功后的会话，gpu_ui.c 只读使用。 */
 extern GpuSession g_gpu;
+
+/* GPU 模块日志句柄：gpu_composer_init 注册，gpu_ui.c 的 LOG_* 共用。 */
+extern log_handle_t g_gpu_log;
 
 int gpu_int_buffer_ok(const GpuBuffer *b);
 

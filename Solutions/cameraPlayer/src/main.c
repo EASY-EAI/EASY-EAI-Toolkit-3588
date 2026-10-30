@@ -546,6 +546,7 @@ static int resolve_cameras(int need)
 
 int main(int argc, char **argv)
 {
+    log_mgr_t log_mgr = LOG_MGR_INVALID;
     int opt;
 
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -578,13 +579,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    {
-        log_mgr_t mgr = log_manager_init("/userdata/logs/cameraStitchPlayer.ini");
-        if (mgr != LOG_MGR_INVALID)
-            g_log = log_register(mgr, "cameraStitchPlayer");
-        if (g_log == LOG_HANDLE_INVALID)
-            fprintf(stderr, "log_manager_pro init failed, logging disabled\n");
-    }
+    log_mgr = log_manager_init("/userdata/logs/cameraStitchPlayer.ini");
+    if (log_mgr != LOG_MGR_INVALID)
+        g_log = log_register(log_mgr, "cameraStitchPlayer");
+    if (g_log == LOG_HANDLE_INVALID)
+        fprintf(stderr, "log_manager_pro init failed, logging disabled\n");
 
     if (resolve_cameras(g_cam_count) != 0)
         return 1;
@@ -641,13 +640,13 @@ int main(int argc, char **argv)
                     goto cleanup;
                 }
             }
-            if (gpu_composer_init() != 0) {
+            if (gpu_composer_init(log_mgr) != 0) {
                 LOG_E("gpu_composer_init failed\n");
                 goto cleanup;
             }
             g_gpu_inited = true;
         } else {
-            if (rga_init() != 0) {
+            if (rga_init(log_mgr) != 0) {
                 LOG_E("rga_init failed\n");
                 goto cleanup;
             }
@@ -660,11 +659,11 @@ int main(int argc, char **argv)
               g_cam_w, g_cam_h, g_cam_w / 2, g_cam_h);
     }
 
-    if (capture_init(&g_capture[0]) != 0) {
+    if (capture_init(&g_capture[0], log_mgr) != 0) {
         LOG_E("V4L2 init /dev/video%d failed\n", g_capture[0].video_num);
         goto cleanup;
     }
-    if (g_cam_count == 2 && capture_init(&g_capture[1]) != 0) {
+    if (g_cam_count == 2 && capture_init(&g_capture[1], log_mgr) != 0) {
         LOG_E("V4L2 init /dev/video%d failed\n", g_capture[1].video_num);
         goto cleanup;
     }

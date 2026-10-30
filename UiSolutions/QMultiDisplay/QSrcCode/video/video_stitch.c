@@ -33,9 +33,13 @@
 #include "rga_util.h"
 #include "video_stitch.h"
 
-/* capture.c / mipi_camera.c / gpu_util.c / rga_util.c 共用的全局 */
+/* capture.c 等模块共用的进程退出标志 */
 volatile sig_atomic_t g_quit;
+
+/* 视频模块自身的日志句柄（gpu / rga / camera 各自持有句柄，见其 init） */
 log_handle_t g_log = LOG_HANDLE_INVALID;
+/* 日志管理器：video_log_init 保存，video_start 时传给各模块 init 注册句柄 */
+static log_mgr_t g_log_mgr = LOG_MGR_INVALID;
 
 typedef enum {
     COMPOSE_RGA = 0,
@@ -520,11 +524,11 @@ static int resolve_cameras(int need)
 
 int video_log_init(const char *config_file, const char *module)
 {
-    log_mgr_t mgr = log_manager_init(config_file);
+    g_log_mgr = log_manager_init(config_file);
 
-    if (mgr == LOG_MGR_INVALID)
+    if (g_log_mgr == LOG_MGR_INVALID)
         return -1;
-    g_log = log_register(mgr, module);
+    g_log = log_register(g_log_mgr, module);
     return (g_log == LOG_HANDLE_INVALID) ? -1 : 0;
 }
 
@@ -592,13 +596,13 @@ int video_start(const VideoConfig *cfg)
                     goto fail;
                 }
             }
-            if (gpu_composer_init() != 0) {
+            if (gpu_composer_init(g_log_mgr) != 0) {
                 LOG_E("gpu_composer_init failed\n");
                 goto fail;
             }
             g_gpu_inited = true;
         } else {
-            if (rga_init() != 0) {
+            if (rga_init(g_log_mgr) != 0) {
                 LOG_E("rga_init failed\n");
                 goto fail;
             }
@@ -611,12 +615,12 @@ int video_start(const VideoConfig *cfg)
               g_cam_w, g_cam_h, g_cam_w / 2, g_cam_h);
     }
 
-    if (capture_init(&g_capture[0]) != 0) {
+    if (capture_init(&g_capture[0], g_log_mgr) != 0) {
         LOG_E("V4L2 init /dev/video%d failed\n", g_capture[0].video_num);
         goto fail;
     }
     g_cap_inited[0] = true;
-    if (g_cam_count == 2 && capture_init(&g_capture[1]) != 0) {
+    if (g_cam_count == 2 && capture_init(&g_capture[1], g_log_mgr) != 0) {
         LOG_E("V4L2 init /dev/video%d failed\n", g_capture[1].video_num);
         goto fail;
     }

@@ -6,6 +6,7 @@
 #include <signal.h>
 
 #include "camera.h"
+#include "log_manager_pro.h"
 
 /* 实时预览只保留最新帧：队列越深，画面延迟越大。 */
 #define QUEUE_CAP 1
@@ -58,8 +59,8 @@ int frame_queue_pop(FrameQueue *q, V4l2Frame *frame);
 /** 非阻塞出队一帧；队列为空返回负值。 */
 int frame_queue_try_pop(FrameQueue *q, V4l2Frame *frame);
 
-/** 打开并启动一路 V4L2 设备；成功返回 0。 */
-int capture_init(CaptureState *c);
+/** 打开并启动一路 V4L2 设备；log_mgr 原样传给 mipicamera_init 注册日志句柄。 */
+int capture_init(CaptureState *c, log_mgr_t log_mgr);
 
 /** 停止采集并关闭设备。 */
 void capture_deinit(CaptureState *c);

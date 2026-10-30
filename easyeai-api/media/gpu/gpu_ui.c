@@ -13,9 +13,11 @@
  *   - gpu_ui_begin/end 只做绑定 + 清屏 + glFinish + 解绑。
  */
 
-#include "app_log.h"
 #include "gpu_internal.h"
 #include "gpu_util.h"
+
+#define APP_LOG_HANDLE g_gpu_log
+#include "app_log.h"
 
 /* 常驻 UI 纹理上限：shell/button/stats/cursor 各一，留余量。 */
 #define GPU_UI_TEX_MAX 8

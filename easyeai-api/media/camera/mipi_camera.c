@@ -17,8 +17,13 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#include "app_log.h"
 #include "camera.h"
+
+/* camera 模块日志句柄：mipicamera_init 注册（重复注册返回同一句柄）。 */
+static log_handle_t s_log = LOG_HANDLE_INVALID;
+
+#define APP_LOG_HANDLE s_log
+#include "app_log.h"
 
 #define CAM_MAX_NUM 4
 #define BUF_COUNT   4
@@ -226,10 +231,11 @@ static int v4l2_open_stream(mipi_camera_t *cam, int width, int height)
     return 0;
 }
 
-int mipicamera_init(int video_num, int width, int height)
+int mipicamera_init(int video_num, int width, int height, log_mgr_t log_mgr)
 {
     mipi_camera_t *cam;
 
+    s_log = app_log_register_module(log_mgr, "camera");
     if (cam_by_video(video_num)) {
         LOG_E("/dev/video%d already open\n", video_num);
         return -1;

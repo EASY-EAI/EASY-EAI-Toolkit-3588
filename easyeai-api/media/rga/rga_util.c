@@ -37,8 +37,13 @@
 #include <rga/im2d.h>
 #include <rga/rga.h>
 
-#include "app_log.h"
 #include "rga_util.h"
+
+/* RGA 模块日志句柄：rga_init 注册。 */
+static log_handle_t s_log = LOG_HANDLE_INVALID;
+
+#define APP_LOG_HANDLE s_log
+#include "app_log.h"
 
 static int g_rga_ready;
 
@@ -107,8 +112,9 @@ static int rga_blit_rect(const rga_buffer_t *src, const im_rect *srect,
     return 0;
 }
 
-int rga_init(void)
+int rga_init(log_mgr_t log_mgr)
 {
+    s_log = app_log_register_module(log_mgr, "rga");
     g_rga_ready = 1;
     return 0;
 }

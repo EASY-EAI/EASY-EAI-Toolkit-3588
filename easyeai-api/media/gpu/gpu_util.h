@@ -18,6 +18,8 @@ extern "C" {
 
 #include <stdint.h>
 
+#include "log_manager_pro.h"
+
 /** 像素格式（与 DRM / V4L2 常用格式对齐，数值可自定）。 */
 typedef enum {
     GPU_FMT_NV12 = 0,     /* Y/UV 4:2:0 semi-planar，对应 DRM NV12 */
@@ -49,9 +51,11 @@ typedef struct {
  * 内部自行打开 DRM 设备（/dev/dri/card0）建 GBM + EGL surfaceless 上下文，
  * 与显示链路（display_pro / display_win）互不复用；deinit 时关闭。
  *
+ * @param log_mgr 日志管理器：init 时在它下面注册本模块日志句柄（"gpu"），
+ *                gpu_util.c / gpu_ui.c 共用；传 LOG_MGR_INVALID 关闭日志
  * @return 0 成功；负值失败
  */
-int gpu_composer_init(void);
+int gpu_composer_init(log_mgr_t log_mgr);
 
 /** 释放 GPU 合成会话。未 init 或已 deinit 时为空操作。 */
 void gpu_composer_deinit(void);
