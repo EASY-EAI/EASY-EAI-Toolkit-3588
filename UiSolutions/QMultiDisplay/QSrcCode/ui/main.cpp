@@ -35,6 +35,8 @@
 
 #include <csignal>
 #include <cstdio>
+#include <cstring>
+#include <functional>
 
 #include "disp_engine.h"
 #include "evdev_input.h"
@@ -50,11 +52,15 @@ public:
     explicit DirtyFilter(QObject *parent) : QObject(parent) {}
     bool eventFilter(QObject *watched, QEvent *event) override
     {
-        if (!s_rendering && event->type() == QEvent::UpdateRequest)
+        if (!s_rendering && event->type() == QEvent::UpdateRequest) {
             dirty = true;
+            if (onDirty)
+                onDirty();
+        }
         return QObject::eventFilter(watched, event);
     }
     bool dirty = false;
+    std::function<void()> onDirty;
 };
 
 struct AppConfig {
@@ -245,33 +251,58 @@ int main(int argc, char *argv[])
     qApp->installEventFilter(&filter);
 
     long uiFrames = 0;
+    /*
+     * UI 光栅化落在普通内存，再整幅拷进显存映射。
+     * 显存是 write-combine 映射：QPainter 的半透明混合要读回目标像素，
+     * 直接画进去实测约 30ms/帧；先画 cached 内存（约 5ms）再 memcpy
+     * （整幅约 1ms）快数倍。
+     */
+    QImage uiCache(ui->width, ui->height, uiFmt);
+
     auto renderFrame = [&]() {
         void *map = nullptr;
         int stride = 0;
         if (disp_ui_begin(&map, &stride) != 0 || !map)
             return;
-        const QImage::Format fmt = (ui->blend_mode == DISP_BLEND_PREMULTI)
-                                       ? QImage::Format_ARGB32_Premultiplied
-                                       : QImage::Format_ARGB32;
-        QImage frame((uchar *)map, ui->width, ui->height, stride, fmt);
-        frame.fill(Qt::transparent);
+
+        uiCache.fill(Qt::transparent);
         s_rendering = true;
-        QPainter painter(&frame);
+        QPainter painter(&uiCache);
         widget.render(&painter);
         painter.end();
         s_rendering = false;
+
+        const size_t rowBytes = (size_t)ui->width * 4;
+        if ((size_t)stride == (size_t)uiCache.bytesPerLine()) {
+            memcpy(map, uiCache.constBits(), rowBytes * (size_t)ui->height);
+        } else {
+            for (int y = 0; y < ui->height; ++y)
+                memcpy((uchar *)map + (size_t)y * stride,
+                       uiCache.constScanLine(y), rowBytes);
+        }
+
         if (disp_ui_commit() == 0)
             uiFrames++;
     };
 
+    renderFrame(); /* 首帧：不等事件，界面立即上屏 */
+
+    /*
+     * 事件驱动渲染：界面变脏才画一帧，取代 33ms 轮询；
+     * 0ms 单次定时器合并同一轮事件里的多次 update()。
+     */
     QTimer renderTimer;
-    renderTimer.start(33);
+    renderTimer.setSingleShot(true);
     QObject::connect(&renderTimer, &QTimer::timeout, &widget, [&]() {
         if (filter.dirty) {
             filter.dirty = false;
             renderFrame();
         }
     });
+    filter.onDirty = [&renderTimer]() {
+        if (!renderTimer.isActive())
+            renderTimer.start();
+    };
 
     QTimer statsTimer;
     statsTimer.start(1000);
