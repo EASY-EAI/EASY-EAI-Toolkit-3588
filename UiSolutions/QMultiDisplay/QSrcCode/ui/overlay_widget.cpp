@@ -154,7 +154,7 @@ void OverlayWidget::updateClock()
                                .arg(date.month(), 2, 10, QLatin1Char('0'))
                                .arg(date.day(), 2, 10, QLatin1Char('0')));
     ui->weekLabel->setText(QString::fromUtf8(kWeek[date.dayOfWeek() - 1]));
-    ui->timeLabel->setText(now.time().toString(QStringLiteral("HH:mm")));
+    ui->timeLabel->setText(now.time().toString(QStringLiteral("HH:mm:ss")));
 }
 
 void OverlayWidget::toggleWelcome()
