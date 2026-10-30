@@ -11,12 +11,17 @@
  *   视频层 = 枚举中首个支持所需格式的图层
  *            （单摄/双摄 RGA → NV12；双摄 GPU → ARGB8888）
  *   UI 层  = 首个支持 ARGB8888 且 ≠ 视频层的图层（可用 --plane 强制指定）
- *   视频层 zpos=0，UI 层 zpos=10，同在 VOP2 一个 VP 下硬件像素级混合。
+ *   光标层 = 首个支持 ARGB8888 且 ≠ 视频层/UI 层的图层（无空闲层则不可用）
+ *   视频层 zpos=0，UI 层 zpos=10，光标层 zpos=11，同在 VOP2 一个 VP 下
+ *   硬件像素级混合。
  *
  * 使用流程：
- *   disp_engine_init()      → disp_init + 选双图层 + UI 双缓冲 + 首帧全透明提交
- *   video_stitch / Qt 各自  → 经 disp_video_* / disp_ui_* 访问两个图层
- *   disp_engine_deinit()    → 释放两个图层、UI 缓冲与 DRM 设备
+ *   disp_engine_init()      → disp_init + 选图层 + UI 双缓冲 + 首帧全透明提交
+ *   video_stitch / Qt 各自  → 经 disp_video_* / disp_ui_* 访问视频/UI 层
+ *   Qt 输入线程             → 经 disp_cursor_move 记录位置，随视频提交合帧上屏
+ *   disp_engine_deinit()    → 释放图层、缓冲与 DRM 设备
+ *
+ * 光标层随视频层同一次 atomic commit 提交，不额外占用 vsync。
  */
 
 #ifndef DISP_ENGINE_H
@@ -28,9 +33,13 @@
 #define DISP_BLEND_PREMULTI   0   /* 预乘 Alpha：配 QImage::Format_ARGB32_Premultiplied */
 #define DISP_BLEND_COVERAGE   1   /* 非预乘 Alpha：配 QImage::Format_ARGB32 */
 
-/* 两图层的叠放顺序：视频在下、UI 在上 */
+/* 三图层的叠放顺序：视频在下、UI 居中、光标最上 */
 #define DISP_VIDEO_ZPOS       0
 #define DISP_UI_ZPOS          10
+#define DISP_CURSOR_ZPOS      11
+
+/* 光标图层像素尺寸（正方形，中心对准指针坐标） */
+#define DISP_CURSOR_SIZE      32
 
 /* UI 图层只读信息（Qt 侧选 QImage 格式、构建界面用） */
 typedef struct {
@@ -89,6 +98,21 @@ int disp_video_set_region(int src_x, int src_y, int src_w, int src_h,
 
 /* 提交视频缓冲上屏（阻塞至 vsync，内部加锁） */
 int disp_video_commit(int buf);
+
+/* ---------------- 光标图层（独立 plane，位置随视频提交） ---------------- */
+
+/* 光标层是否可用：1 可用，0 无空闲 ARGB 图层 */
+int disp_cursor_available(void);
+
+/* 取光标缓冲映射（ARGB8888 预乘），用于初始化时绘制一次光标图案 */
+int disp_cursor_map(void **map, int *stride);
+
+/*
+ * 记录指针中心坐标（越界自动收进屏幕），只更新待应用位置；
+ * 随下一次 disp_video_commit 与视频层合帧上屏。无锁、不阻塞。
+ * 返回 0 成功，-1 表示无光标层。
+ */
+int disp_cursor_move(int x, int y);
 
 #ifdef __cplusplus
 }

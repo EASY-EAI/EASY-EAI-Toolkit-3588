@@ -8,10 +8,11 @@
  *        │ 双目: RGA / GPU 各缩半宽拼接 → 2 块输出缓冲轮转
  *        ▼
  *   视频图层 zpos=0 ──► VOP2 同一 VP 硬件像素级混合 ◄── UI 图层 zpos=10
- *        (disp_engine 互斥锁串行化两条提交路径)          ARGB 半透明
+ *        (disp_engine 互斥锁串行化各提交路径)            ARGB 半透明
  *                                                          ▲
  *                                     QWidget::render() → QImage 包显存 mmap
  *                                     (Qt offscreen，不碰显示设备) ── evdev 输入
+ *   光标图层 zpos=11：位置随视频帧合帧提交（无空闲层则退回 widget 自绘）
  *
  * 参数（-n/-w/-h/-C/-L/-R 与 cameraPlayer 完全一致）：
  *   -n 1|2    摄像头数，默认 1；2 = 双目各缩半宽拼接上屏
@@ -190,10 +191,35 @@ int main(int argc, char *argv[])
     OverlayWidget widget(ui->width, ui->height, ui->plane_id, ui->alpha8);
     widget.show();
 
+    const QImage::Format uiFmt = (ui->blend_mode == DISP_BLEND_PREMULTI)
+                                     ? QImage::Format_ARGB32_Premultiplied
+                                     : QImage::Format_ARGB32;
+
+    /* 硬件光标：独立图层随视频帧合帧提交（图案只画一次），移动不重绘
+       UI、不额外占 vsync；无空闲图层时退回 widget 自绘光标。 */
+    const bool hwCursor = disp_cursor_available() != 0;
+    if (hwCursor) {
+        void *cmap = nullptr;
+        int cstride = 0;
+        if (disp_cursor_map(&cmap, &cstride) == 0 && cmap) {
+            QImage img((uchar *)cmap, DISP_CURSOR_SIZE, DISP_CURSOR_SIZE,
+                       cstride, uiFmt);
+            img.fill(Qt::transparent);
+            QPainter p(&img);
+            p.setRenderHint(QPainter::Antialiasing);
+            p.setPen(QPen(QColor(255, 255, 255, 210), 2));
+            p.setBrush(QColor(0, 150, 255, 150));
+            p.drawEllipse(QPointF(DISP_CURSOR_SIZE / 2.0,
+                                  DISP_CURSOR_SIZE / 2.0), 9, 9);
+            p.end();
+        }
+        disp_cursor_move(ui->width / 2, ui->height / 2);
+    }
+
     /* evdev → QMouseEvent（offscreen 平台没有系统输入） */
     EvdevInput input(ui->width, ui->height);
     QObject::connect(&input, &EvdevInput::pointerEvent, &widget,
-                     [&widget](int type, int x, int y) {
+                     [&widget, hwCursor](int type, int x, int y) {
         QEvent::Type et = QEvent::MouseMove;
         Qt::MouseButtons btns = Qt::NoButton;
         if (type == EvdevInput::PointerPress) {
@@ -207,7 +233,10 @@ int main(int argc, char *argv[])
                        Qt::LeftButton, btns, Qt::NoModifier);
         if (widget.windowHandle())
             QCoreApplication::sendEvent(widget.windowHandle(), &ev);
-        widget.setPointer(x, y);
+        if (hwCursor)
+            disp_cursor_move(x, y);
+        else
+            widget.setPointer(x, y);
     });
     input.start();
 
