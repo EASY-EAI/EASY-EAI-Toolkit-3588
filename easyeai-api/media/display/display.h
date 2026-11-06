@@ -46,7 +46,9 @@ int display_overlay_init(void);
  * @param format    像素格式
  * @param pitch     每行字节数；NV12 的 Y/UV 平面共用，UV 平面紧随 Y 平面
  * @return 0 成功，< 0 失败（-ENODEV 未初始化，-EINVAL 参数或格式无效，其余为负的 errno）
- * @note 每帧导入并释放一次 DMA-BUF，返回后调用方即可关闭 fd
+ * @note DMA-BUF 按（dma-buf 对象、尺寸、格式、跨距）缓存复用，单层最多缓存 4 个，
+ *       超出后按 LRU 淘汰未被当前帧显示的缓冲；返回后调用方即可关闭 fd，
+ *       显示层持有自己的副本，缓存随 uninit 释放
  */
 int display_overlay_commit(int dmabuf_fd, int width, int height, DisplayFmt_t format, int pitch);
 
@@ -68,7 +70,9 @@ int display_primary_init(void);
  * @param format    像素格式
  * @param pitch     每行字节数；NV12 的 Y/UV 平面共用，UV 平面紧随 Y 平面
  * @return 0 成功，< 0 失败（-ENODEV 未初始化，-EINVAL 参数或格式无效，其余为负的 errno）
- * @note 每帧导入并释放一次 DMA-BUF，返回后调用方即可关闭 fd
+ * @note DMA-BUF 按（dma-buf 对象、尺寸、格式、跨距）缓存复用，单层最多缓存 4 个，
+ *       超出后按 LRU 淘汰未被当前帧显示的缓冲；返回后调用方即可关闭 fd，
+ *       显示层持有自己的副本，缓存随 uninit 释放
  */
 int display_primary_commit(int dmabuf_fd, int width, int height, DisplayFmt_t format, int pitch);
 

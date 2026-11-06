@@ -394,3 +394,4 @@ int disp_drop_master(void);
 #endif
 
 #endif /* DISPLAY_PRO_H */
+
