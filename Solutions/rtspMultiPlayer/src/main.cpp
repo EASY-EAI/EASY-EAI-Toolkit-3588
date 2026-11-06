@@ -55,7 +55,7 @@ int main(int argc, char **argv)
     }
 
     /* Create Display */
-    Display_t dispDesc = {"rtspMulitPlayer",0,0,1920,1080};
+    Display_t dispDesc = {"rtspMultiPlayer",0,0,1920,1080};
     char **pDispBuffer = dispBufferMap(&dispDesc);
     if(!(*pDispBuffer)){
         return -2;
