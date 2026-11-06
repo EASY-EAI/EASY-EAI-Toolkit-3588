@@ -13,15 +13,16 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 static const SrcCfg_t SrcCfg_tab[] = {
 	{
-        .srcType   = "rtsp",
-        .loaction  = "rtsp://admin:a12345678@192.168.1.66",
-        .videoEncType = "h264",
-        .audioEncType = "null",
-	}, {
 		.srcType   = "rtsp",
-		.loaction  = "rtsp://admin:a12345678@192.168.1.67",
+		.loaction  = "rtsp://192.168.100.165:8554/test01",
 		.videoEncType = "h264",
 		.audioEncType = "null",
+/*
+	}, {
+        .srcType   = "rtsp",
+        .loaction  = "rtsp://192.168.3.101:554/aabb",
+        .videoEncType = "h265",
+        .audioEncType = "pcma",
 	}, {
 		.srcType   = "rtsp",
 		.loaction  = "rtsp://admin:a12345678@192.168.1.68",
@@ -32,7 +33,6 @@ static const SrcCfg_t SrcCfg_tab[] = {
 		.loaction  = "rtsp://admin:a12345678@192.168.1.69",
 		.videoEncType = "h264",
 		.audioEncType = "null",
-/*
 	}, { // *以下格式尚未研发完成，暂不投入使用
 		.srcType   = "file",
 		.loaction  = "/userdata/mydata/car.mp4",
@@ -94,6 +94,8 @@ int main(int argc, char **argv)
             pCapturer[i] = NULL;
         }
     }
+
+    display_deinit();
     
     return 0;
 }

@@ -6,6 +6,14 @@ SHELL_FOLDER=$(cd "$(dirname "$0")";pwd)
 cd $SHELL_FOLDER
 
 CUR_DIR_NAME=`basename "$SHELL_FOLDER"`
+
+# 交叉编译时让 pkg-config 只查目标 sysroot，避免误用宿主机 .pc
+if [ -n "$SYSROOT" ]; then
+	export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
+	export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/aarch64-linux-gnu/pkgconfig:$SYSROOT/usr/share/pkgconfig
+	unset PKG_CONFIG_PATH
+fi
+
 warring() {
 	echo "DESCRIPTION"
 	echo "EASYAI-3588 Solution Project."

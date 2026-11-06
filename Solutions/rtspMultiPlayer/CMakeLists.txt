@@ -28,12 +28,15 @@ set(media_root     ${toolkit_root}/media)
 
 include (${common_root}/base64/api.cmake)
 include (${common_root}/system_opt/api.cmake)
+include (${common_root}/log_manager_pro/api.cmake)
 include (${media_root}/gst_opt/api.cmake)
 ## api头文件路径
 set(api_inc 
     ${BASE64_INCLUDE_DIRS} 
     ${SYSOPT_INCLUDE_DIRS} 
+    ${LOGMANAGERPRO_INCLUDE_DIRS}
     ${GSTOPT_INCLUDE_DIRS} 
+    ${media_root}/display
     )
 ## api源文件路径
 file(GLOB api_srcs 
@@ -43,12 +46,17 @@ file(GLOB api_srcs
 ## api静态库文件路径
 link_directories(
     ${GSTOPT_LIBS_DIRS} 
+    ${media_root}/display/${CMAKE_BOARDSYS}
+    ${LOGMANAGERPRO_LIBS_DIRS}
 )
 ## api所依赖的库参数
 set(sysLib_list 
     ${BASE64_LIBS} 
     ${SYSOPT_LIBS} 
     ${GSTOPT_LIBS} 
+    drm
+    display
+    log_manager_pro
     )
 # ======================== easyeai_api =========================
 
@@ -65,39 +73,11 @@ set(OpenCV_LIBS_DIRS
     ${CAMKE_SYSROOT}/usr/lib/aarch64-linux-gnu/blas
 )
 
-## 在/usr/lib/aarch64-linux-gnu/pkgconfig/下的pc文件，都可以通过这种方式查找
-## 用法：
-## find_package(PkgConfig)
-## pkg_search_module(<prefix> REQUIRED [xxxx])
-## pkg_search_module(<prefix1> REQUIRED [xxxx])
-## pkg_search_module(<prefix2> REQUIRED [xxxx] [xxxxxxxxxxx])
-## 备注：
-##   <prefix>_FOUND：如果找到模块，此变量为1
-##   <prefix>_LIBRARIES：模块的链接库名称（不包含-l）
-##   <prefix>_LINK_LIBRARIES：模块的链接库名称（包含绝对路径）
-##   <prefix>_LIBRARY_DIRS：模块的链接库路径（不包含-L）
-##   <prefix>_INCLUDE_DIRS：模块的头文件路径（不包含-I）
-##   <prefix>_LDFLAGS：链接flags
-##   <prefix>_LDFLAGS_OTHER：额外的链接flags
-##   <prefix>_CFLAGS：所有的编译器cflags
-##   <prefix>_CFLAGS_OTHER：其他的编译器cflags
-## pkg_check_modules 和 pkg_search_module 的异/同：
-##   同：功能都是相同的，而且都能搜索多个模块，如：pkg_check_modules(AAAAA REQUIRED libxml-2.0 libxml2 libxml>=2)
-##   异：
-##       pkg_check_modules: 必须所有模块都存在，才能生效
-##       pkg_search_module: 只要第一个模块存在，就能生效
-
-find_package(PkgConfig)
-pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
-#pkg_search_module(GST1.0 REQUIRED gstreamer-1.0)
-#pkg_check_modules(GST1.0_VIDEO REQUIRED gstreamer-video-1.0)
+## 显示走 DRM/KMS（easyeai-api/media/display），不再依赖 GTK
 
 # -I
 set(custom_inc
     ${OpenCV_INCLUDE_DIRS} 
-    ${GTK3_INCLUDE_DIRS} 
-    #${GST1.0_INCLUDE_DIRS} 
-    #${GST1.0_VIDEO_INCLUDE_DIRS} 
     ${PROJECT_SOURCE_DIR}/include
 )
 # -L
@@ -108,9 +88,6 @@ link_directories(
 set(custom_libs
     rga 
     ${OpenCV_LIBS} 
-    ${GTK3_LIBRARIES} 
-    #${GST1.0_LIBRARIES} 
-    #${GST1.0_VIDEO_LIBRARIES} 
 )
 # source code
 aux_source_directory(./src dir_srcs)

@@ -30,7 +30,6 @@
 #include <iconv.h>
 
 #include <rga/RgaApi.h>
-#include <gtk/gtk.h>
 
 #define SYS_TRUE 1
 #define SYS_FALSE 0
